@@ -12,7 +12,7 @@ FIXED_FILE = "storage/fixed_expenses.json"
 
 def load_data():
     try:
-        with open(FILE, "w", encoding="utf-8") as f:            return json.load(f)
+        with open(FILE, "r", encoding="utf-8") as f:            return json.load(f)
     except:
         return []
 
@@ -54,7 +54,7 @@ def reset_expenses():
 
 def load_budget():
     try:
-        with open(BUDGET_FILE, "w", encoding="utf-8") as f:
+        with open(BUDGET_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     except:
         return {
@@ -64,7 +64,7 @@ def load_budget():
 
 
 def save_budget(data):
-    with open(BUDGET_FILE) as f:
+    with open(BUDGET_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
 
@@ -90,7 +90,7 @@ def set_category_budget(category, amount):
 
 def load_fixed():
     try:
-        with open(FIXED_FILE, "w", encoding="utf-8") as f:
+        with open(FIXED_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     except:
         return []
