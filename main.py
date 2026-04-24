@@ -16,16 +16,18 @@ from logic.summary import (
 )
 
 
+VALID_CATEGORIES = ["אוכל", "אוכל בחוץ", "תחבורה", "דיור", "בגדים", "חשבונות", "בלתי צפוי", "כללי"]
+
+
 def handle(text):
     pending = get_pending()
 
+    # 🔁 טיפול בהודעה המשך (בחירת קטגוריה)
     if pending:
         category = text.strip()
 
-        VALID = ["אוכל", "תחבורה", "דיור", "בגדים", "חשבונות", "בלתי צפוי", "כללי"]
-
-        if category not in VALID:
-            return "קטגוריה לא תקינה, נסה שוב"
+        if category not in VALID_CATEGORIES:
+            return "קטגוריה לא תקינה, נסה שוב\n" + " | ".join(VALID_CATEGORIES)
 
         pending["category"] = category
 
@@ -35,6 +37,8 @@ def handle(text):
         clear_pending()
 
         return f"נשמר: {pending['amount']}₪ על {pending['description']} ({category})"
+
+    # 🧠 parsing
     try:
         data = parse_message(text)
     except Exception:
@@ -42,21 +46,22 @@ def handle(text):
 
     action = data.get("action")
 
+    # ➕ הוספת הוצאה
     if action == "add_expense":
         category, confidence = normalize_category(
             data.get("category", ""),
             data.get("description", "")
         )
 
-        # ❗ לא בטוח → שמור pending
+        # ❗ לא בטוח
         if not category:
             set_pending(data)
 
             return (
                 f"לא בטוח לאיזה קטגוריה לשייך 🤔\n"
-                f"הוצאה: {data['description']} {data['amount']}₪\n"
-                "בחר קטגוריה:\n"
-                "אוכל | תחבורה | דיור | בגדים | חשבונות | בלתי צפוי | אחר"
+                f"הוצאה: {data['description']} {data['amount']}₪\n\n"
+                "בחר קטגוריה:\n" +
+                " | ".join(VALID_CATEGORIES)
             )
 
         data["category"] = category
@@ -64,8 +69,9 @@ def handle(text):
         save_expense(data)
         learn(data["description"], category)
 
-        return f"נשמר: {data['amount']}₪ על {data['description']} ({data['category']}, {int(confidence*100)}%)"    
+        return f"נשמר: {data['amount']}₪ על {data['description']} ({category}, {int(confidence*100)}%)"
 
+    # 📊 סיכום חודשי
     elif action == "get_summary":
         total, categories = get_monthly_summary()
         budget_data = get_budget()
@@ -100,12 +106,15 @@ def handle(text):
     elif action == "get_category":
         category = data.get("category")
 
+        # 🔥 נרמול גם כאן!
+        category, _ = normalize_category(category)
+
         total = get_category_total(category)
         budget_data = get_budget()
         cat_budget = budget_data.get("categories", {}).get(category, 0)
 
         if cat_budget > 0:
-            percent_used = int((total / cat_budget) * 100)
+            percent_used = int((total / cat_budget) * 100) if cat_budget > 0 else 0
             remaining = cat_budget - total
 
             return (
@@ -116,12 +125,13 @@ def handle(text):
             )
 
         return f"סה״כ על {category}: {total}₪"
-    
+
+    # 🔁 הוצאה קבועה
     elif action == "add_fixed_expense":
         add_fixed_expense(data)
         return f"הוצאה קבועה נוספה: {data['description']} {data['amount']}₪"
 
-    # ❌ מחיקת הוצאה אחרונה
+    # ❌ מחיקה
     elif action == "delete_last":
         deleted = delete_last_expense()
 
@@ -130,12 +140,12 @@ def handle(text):
         else:
             return "אין מה למחוק"
 
-    # 💰 הגדרת תקציב כולל
+    # 💰 תקציב כולל
     elif action == "set_total_budget":
         set_total_budget(data["amount"])
         return f"התקציב הכולל הוגדר ל־{data['amount']}₪"
 
-    # 📊 הגדרת תקציב לפי קטגוריה
+    # 📊 תקציב לפי קטגוריה
     elif action == "set_category_budget":
         category = data["category"]
         amount = data["amount"]
@@ -168,6 +178,7 @@ def handle(text):
     # 📂 כמה נשאר בקטגוריה
     elif action == "remaining_category":
         category = data.get("category")
+        category, _ = normalize_category(category)
 
         budget_data = get_budget()
         cat_budget = budget_data.get("categories", {}).get(category, 0)
@@ -189,7 +200,7 @@ def handle(text):
 
         return msg
 
-    # 🤷 לא מובן
+    # 🤷 fallback
     elif action == "unknown":
         if "היי" in text or "שלום" in text:
             return "היי 👋 אני מנהל ההוצאות שלך\nנסה לכתוב: קפה 15"
@@ -204,6 +215,7 @@ def handle(text):
         )
 
     return "שגיאה לא צפויה 😅"
+
 
 
 # ▶️ הרצה מקומית

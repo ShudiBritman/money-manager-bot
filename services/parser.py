@@ -16,7 +16,7 @@ def parse_message(text):
 {
  "action": "add_expense",
  "amount": number,
- "category": "אוכל | תחבורה | דיור | קניות | חשבונות | אחר",
+ "category": "בגדים |בלתי צפוי | אוכל | תחבורה | דיור | חשבונות | כללי | אוכל בחוץ"
  "description": string
 }
 
@@ -24,7 +24,7 @@ def parse_message(text):
 {
  "action": "add_fixed_expense",
  "amount": number,
- "category": "אוכל | תחבורה | דיור | בגדים | חשבונות | בלתי צפוי | כללי",
+ "category": "אוכל | תחבורה | דיור | בגדים | חשבונות | בלתי צפוי | כללי | אוכל בחוץ",
  "description": string
 }
 
