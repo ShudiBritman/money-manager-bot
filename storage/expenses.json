@@ -1,0 +1,30 @@
+[
+  {
+    "action": "add_expense",
+    "amount": 15,
+    "category": "\u05d0\u05d5\u05db\u05dc",
+    "description": "\u05e7\u05e4\u05d4",
+    "date": "2026-04-24T13:12:14.589608"
+  },
+  {
+    "action": "add_expense",
+    "amount": 30,
+    "category": "\u05d1\u05d2\u05d3\u05d9\u05dd",
+    "description": "\u05d2\u05e8\u05d1\u05d9\u05d9\u05dd",
+    "date": "2026-04-24T13:14:03.653078"
+  },
+  {
+    "action": "add_expense",
+    "amount": 20,
+    "category": "\u05d1\u05d2\u05d3\u05d9\u05dd",
+    "description": "\u05e7\u05e0\u05d9\u05d5\u05ea \u05d2\u05e8\u05d1\u05d9\u05d9\u05dd",
+    "date": "2026-04-24T13:14:19.377108"
+  },
+  {
+    "action": "add_expense",
+    "amount": 120,
+    "category": "\u05d1\u05d2\u05d3\u05d9\u05dd",
+    "description": "\u05e7\u05e0\u05d9\u05ea\u05d9 \u05d7\u05d5\u05dc\u05e6\u05d4",
+    "date": "2026-04-24T13:21:08.448935"
+  }
+]
