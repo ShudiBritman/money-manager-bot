@@ -22,12 +22,23 @@ VALID_CATEGORIES = ["אוכל", "אוכל בחוץ", "תחבורה", "דיור",
 def handle(text):
     pending = get_pending()
 
-    # 🔁 טיפול בהודעה המשך (בחירת קטגוריה)
-    if pending:
-        category = text.strip()
+# 🔥 אם המשתמש שלח הוצאה חדשה → בטל pending
+    if pending and any(char.isdigit() for char in text):
+        clear_pending()
+        pending = None
 
-        if category not in VALID_CATEGORIES:
-            return "קטגוריה לא תקינה, נסה שוב\n" + " | ".join(VALID_CATEGORIES)
+    # 🔁 טיפול בהודעה המשך (רק אם זה נראה כמו תשובה)
+    if pending and len(text.split()) <= 3:
+        category_input = text.strip()
+
+        category, confidence = normalize_category(category_input, category_input)
+
+        if not category:
+            clear_pending()
+            return (
+                "לא הצלחתי להבין את הקטגוריה 🤔\n"
+                "נסה לבחור:\n" + " | ".join(VALID_CATEGORIES)
+            )
 
         pending["category"] = category
 
@@ -104,10 +115,11 @@ def handle(text):
 
     # 📂 סיכום לפי קטגוריה
     elif action == "get_category":
-        category = data.get("category")
+        category_input = data.get("category", "")
+        category, _ = normalize_category(category_input, category_input)
 
-        # 🔥 נרמול גם כאן!
-        category, _ = normalize_category(category)
+        if not category:
+            return "לא הצלחתי להבין את הקטגוריה"
 
         total = get_category_total(category)
         budget_data = get_budget()
@@ -177,8 +189,11 @@ def handle(text):
 
     # 📂 כמה נשאר בקטגוריה
     elif action == "remaining_category":
-        category = data.get("category")
-        category, _ = normalize_category(category)
+        category_input = data.get("category", "")
+        category, _ = normalize_category(category_input, category_input)
+
+        if not category:
+            return "לא הצלחתי להבין את הקטגוריה"
 
         budget_data = get_budget()
         cat_budget = budget_data.get("categories", {}).get(category, 0)
