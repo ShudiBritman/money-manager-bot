@@ -30,10 +30,12 @@ def apply_fixed_expenses(data):
     for f in fixed:
         exists = any(
             e.get("description") == f["description"]
+            and e.get("amount") == f["amount"]
+            and e.get("category") == f["category"]
+            and e.get("date")
             and start <= datetime.fromisoformat(e["date"]) < end
             for e in data
         )
-
         if not exists:
             data.append({
                 "amount": f["amount"],

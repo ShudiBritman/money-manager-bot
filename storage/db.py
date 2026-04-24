@@ -12,14 +12,13 @@ FIXED_FILE = "storage/fixed_expenses.json"
 
 def load_data():
     try:
-        with open(FILE, "r") as f:
-            return json.load(f)
+        with open(FILE, "w", encoding="utf-8") as f:            return json.load(f)
     except:
         return []
 
 
 def save_data(data):
-    with open(FILE, "w") as f:
+    with open(FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
 
@@ -43,6 +42,11 @@ def delete_last_expense():
 
     return last
 
+def reset_expenses():
+    # מוחק את כל ההוצאות
+    with open(FILE, "w", encoding="utf-8") as f:
+        json.dump([], f, indent=2)
+
 
 # -----------------------
 # 💰 תקציב
@@ -50,7 +54,7 @@ def delete_last_expense():
 
 def load_budget():
     try:
-        with open(BUDGET_FILE, "r") as f:
+        with open(BUDGET_FILE, "w", encoding="utf-8") as f:
             return json.load(f)
     except:
         return {
@@ -60,7 +64,7 @@ def load_budget():
 
 
 def save_budget(data):
-    with open(BUDGET_FILE, "w") as f:
+    with open(BUDGET_FILE) as f:
         json.dump(data, f, indent=2)
 
 
@@ -86,22 +90,35 @@ def set_category_budget(category, amount):
 
 def load_fixed():
     try:
-        with open(FIXED_FILE, "r") as f:
+        with open(FIXED_FILE, "w", encoding="utf-8") as f:
             return json.load(f)
     except:
         return []
 
 
 def save_fixed(data):
-    with open(FIXED_FILE, "w") as f:
+   with open(FIXED_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
 
 def add_fixed_expense(expense):
     data = load_fixed()
-    data.append(expense)
+
+    if any(f["description"] == expense["description"] for f in data):
+        return
+    new_expense = {
+        "amount": expense["amount"],
+        "category": expense["category"],
+        "description": expense["description"]
+    }
+
+    data.append(new_expense)
     save_fixed(data)
 
 
 def get_fixed_expenses():
-    return load_fixed()
+    data = load_fixed()
+    return data if data else []
+
+def reset_fixed_expenses():
+    save_fixed([])

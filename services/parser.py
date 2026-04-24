@@ -73,6 +73,19 @@ def parse_message(text):
  "action": "unknown"
 }
 
+10. איפוס נתונים:
+{
+ "action": "reset"
+}
+11. הצגת הוצאות קבועות:
+{
+ "action": "get_fixed_expenses"
+}
+12. איפוס הוצאות קבועות:
+{
+ "action": "reset_fixed_expenses"
+}
+
 חוקים:
 - להבין עברית חופשית
 - לזהות סכומים גם בתוך משפט
