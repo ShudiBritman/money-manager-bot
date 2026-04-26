@@ -97,7 +97,7 @@ def handle(text):
     try:
         data = parse_message(text)
     except Exception as e:
-        print("PARSER ERROR:", e)
+        print("PARSER ERROR:", str(e))
         return "שגיאה, נסה שוב 🙏"
 
     action = data.get("action")

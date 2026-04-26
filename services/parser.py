@@ -125,6 +125,14 @@ def parse_message(text):
     except:
         data = {"action": "unknown"}
 
+    if not data:
+        print("❌ PARSER RETURNED NONE")
+        return "לא הבנתי 🤔"
+
+    if "action" not in data:
+        print("❌ MISSING ACTION:", data)
+        return "לא הבנתי 🤔"
+
     # 🔥 זיהוי חודש
     month = detect_month(text)
 
