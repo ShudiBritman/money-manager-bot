@@ -6,8 +6,22 @@ STOPWORDS = {
     "על", "עם", "של", "את", "זה", "זו",
     "קניתי", "קונה", "שילמתי", "הוצאתי",
     "שקל", "שח", "₪",
-    "לי", "שלי", "זה", "פה", "שם"
+    "לי", "שלי", "פה", "שם",
+    "הוצאה", "עלה", "כמה", "זה", "יש"
 }
+
+
+def clean_word(w):
+    return (
+        w.strip()
+        .replace(",", "")
+        .replace(".", "")
+        .replace("₪", "")
+    )
+
+
+def is_number(w):
+    return w.replace(".", "", 1).isdigit()
 
 
 def tokenize(text):
@@ -16,15 +30,21 @@ def tokenize(text):
     filtered = []
 
     for w in words:
-        # ❌ סינון מספרים
-        if w.isdigit():
+        w = clean_word(w)
+
+        # ❌ ריק
+        if not w:
             continue
 
-        # ❌ סינון מילים קצרות מדי
+        # ❌ מספרים
+        if is_number(w):
+            continue
+
+        # ❌ קצר מדי
         if len(w) < 3:
             continue
 
-        # ❌ סינון מילים לא רלוונטיות
+        # ❌ מילים לא רלוונטיות
         if w in STOPWORDS:
             continue
 
@@ -34,6 +54,10 @@ def tokenize(text):
 
 
 def learn(description, category):
+    # ❌ לא לומדים אם אין קטגוריה תקינה
+    if not category:
+        return
+
     words = tokenize(description)
 
     if not words:
@@ -53,9 +77,19 @@ def predict_category_with_confidence(description):
     if not scores:
         return None, 0
 
+    # ❌ הגנה אם DB מחזיר משהו מוזר
+    scores = {k: v for k, v in scores.items() if v > 0}
+
+    if not scores:
+        return None, 0
+
     best = max(scores, key=scores.get)
     total = sum(scores.values())
 
     confidence = scores[best] / total if total > 0 else 0
+
+    # ❗ אם הביטחון נמוך מדי → לא לסמוך על זה
+    if confidence < 0.4:
+        return None, 0
 
     return best, confidence

@@ -65,9 +65,20 @@ def handle(text):
         return "לא הבנתי 🤔 כתוב כן או לא"
 
     # =========================
-    # 🔥 ביטול pending אם זו הוצאה
+    # 🧠 parsing (פעם אחת בלבד!)
     # =========================
-    if pending and parse_message(text).get("action") == "add_expense":
+    try:
+        data = parse_message(text)
+    except Exception as e:
+        logger.error(f"PARSER ERROR: {e}")
+        return "שגיאה, נסה שוב 🙏"
+
+    action = data.get("action")
+
+    # =========================
+    # 🔥 ביטול pending אם זו הוצאה חדשה
+    # =========================
+    if pending and action == "add_expense":
         clear_pending()
         pending = None
 
@@ -80,7 +91,6 @@ def handle(text):
         category, confidence = normalize_category(category_input, "")
 
         if not category:
-            clear_pending()
             return (
                 "לא הצלחתי להבין את הקטגוריה 🤔\n"
                 "נסה לבחור:\n" + " | ".join(VALID_CATEGORIES)
@@ -99,27 +109,17 @@ def handle(text):
         return f"נשמר: {pending['amount']}₪ על {pending['description']} ({category})"
 
     # =========================
-    # 🧠 parsing
-    # =========================
-    try:
-        data = parse_message(text)
-    except Exception as e:
-        logger.error(f"PARSER ERROR: {e}")
-        return "שגיאה, נסה שוב 🙏"
-
-    action = data.get("action")
-
-    # =========================
     # ➕ הוספת הוצאה
     # =========================
     if action == "add_expense":
         description = data.get("description") or text
 
         category, confidence = normalize_category(
-            data.get("category", ""),
+            data.get("category"),
             description
         )
 
+        # ❗ אם לא בטוח → שואל
         if not category:
             data["description"] = description
             set_pending(data)
@@ -143,7 +143,6 @@ def handle(text):
             return f"נשמר: {data['amount']}₪ על {description} ({category})"
         else:
             return f"נשמר: {data['amount']}₪ על {description} ({category}, {int(confidence*100)}%)"
-
 
     # =========================
     # 📊 סיכום חודשי
@@ -200,7 +199,6 @@ def handle(text):
 
         add_fixed_expense(data)
         return f"הוצאה קבועה נוספה: {description} {data['amount']}₪"
-
 
     elif action == "reset_fixed_expenses":
         set_pending({"action": "confirm_reset_fixed"})
@@ -274,7 +272,7 @@ def handle(text):
         return result
 
     # =========================
-    # 📅 סיכום לפי חודש (DB)
+    # 📅 סיכום לפי חודש
     # =========================
     elif action == "get_month_summary":
 
@@ -304,7 +302,6 @@ def handle(text):
     return "לא הבנתי 🤔"
 
 
-# ▶️ הרצה מקומית
 if __name__ == "__main__":
     while True:
         text = input("You: ")

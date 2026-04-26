@@ -62,8 +62,8 @@ def save_expense(expense):
         VALUES (%s, %s, %s, %s)
         """,
         (
-            float(expense["amount"]),
-            expense["category"],
+            float(expense.get("amount", 0)),
+            expense.get("category"),
             expense.get("description", ""),
             datetime.now()
         )
@@ -129,6 +129,9 @@ def set_total_budget(amount):
 
 
 def set_category_budget(category, amount):
+    if not category:
+        return
+
     query(
         """
         INSERT INTO category_budget (category, amount)
@@ -167,8 +170,8 @@ def add_fixed_expense(expense):
         VALUES (%s, %s, %s)
         """,
         (
-            float(expense["amount"]),
-            expense["category"],
+            float(expense.get("amount", 0)),
+            expense.get("category"),
             expense.get("description", "")
         )
     )
@@ -230,18 +233,23 @@ def get_summary_by_month_db(year, month, category=None):
 
 
 # -----------------------
-# 🧠 LEARNING (משופר!)
+# 🧠 LEARNING (משופר)
 # -----------------------
 
 def learn_words(words, category):
-    if not words:
+    if not words or not category:
         return
 
     conn = get_conn()
     try:
         with conn:
             with conn.cursor() as cur:
-                for word in set(words):  # בלי כפילויות
+                for word in set(words):
+
+                    # ❌ סינון מילים גרועות גם בצד DB
+                    if len(word) < 3 or word.isdigit():
+                        continue
+
                     cur.execute(
                         """
                         INSERT INTO learning (word, category, count, updated_at)
@@ -272,4 +280,4 @@ def get_learning_scores(words):
         fetch=True
     ) or []
 
-    return {r[0]: r[1] for r in rows}
+    return {r[0]: float(r[1]) for r in rows}

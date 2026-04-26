@@ -1,6 +1,7 @@
 import json
 import os
 import logging
+import re
 from .openai_service import ask_gpt
 
 logging.basicConfig(level=logging.INFO)
@@ -12,6 +13,13 @@ MONTHS = [
     "ינואר","פברואר","מרץ","אפריל","מאי","יוני",
     "יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"
 ]
+
+STOPWORDS = {
+    "על", "עם", "של", "את", "זה", "זו",
+    "קניתי", "קונה", "שילמתי", "הוצאתי",
+    "שקל", "שח", "₪",
+    "לי", "שלי", "פה", "שם"
+}
 
 
 # -----------------------
@@ -33,6 +41,26 @@ def save_memory(memory):
 
 
 # -----------------------
+# 🧠 ניקוי מילים
+# -----------------------
+def tokenize(text):
+    words = re.findall(r'\w+', text.lower())
+
+    filtered = []
+    for w in words:
+        if w.isdigit():
+            continue
+        if len(w) < 3:
+            continue
+        if w in STOPWORDS:
+            continue
+
+        filtered.append(w)
+
+    return filtered
+
+
+# -----------------------
 # 🧠 למידה
 # -----------------------
 def learn_category(text, category):
@@ -40,11 +68,9 @@ def learn_category(text, category):
         return
 
     memory = load_memory()
-    words = text.lower().split()
+    words = tokenize(text)
 
     for w in words:
-        if len(w) < 3:
-            continue
         memory[w] = category
 
     save_memory(memory)
@@ -63,7 +89,7 @@ def fix_category(text, category):
             return cat
 
     # 2. חוקים קשיחים
-    if any(w in text_lower for w in ["חולצה", "מכנס", "נעל", "בגד"]):
+    if any(w in text_lower for w in ["חולצה", "מכנס", "נעל", "בגד", "כיפה"]):
         return "בגדים"
 
     if any(w in text_lower for w in ["אוכל", "קפה", "מסעדה", "פיצה", "סופר"]):
@@ -174,11 +200,11 @@ get_fixed_expenses, reset_fixed_expenses, get_month_summary
         if fixed:
             data["category"] = fixed
 
-            # ✅ למידה רק אם בטוחים
+            # ✅ לומד רק מילים נקיות
             learn_category(text, fixed)
 
         else:
-            # ❗ אין קטגוריה → שואל user
+            # ❗ גורם למערכת לשאול את המשתמש
             data["category"] = None
 
     return data
