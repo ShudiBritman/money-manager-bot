@@ -11,7 +11,7 @@ def whatsapp():
 
     print("📩 INCOMING:", incoming_msg, flush=True)
 
-    reply = "hello"
+    reply = handle(incoming_msg)
 
     if not reply:
         reply = "לא הבנתי 🤔"
