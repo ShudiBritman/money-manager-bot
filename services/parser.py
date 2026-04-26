@@ -120,23 +120,30 @@ def parse_message(text):
 
     response = ask_gpt(messages)
 
+    if not response:
+        return {"action": "unknown"}
+
+    response = response.strip()
+
+    if response.startswith("```"):
+        response = response.split("```")[1]
+
+    response = response.replace("json", "").strip()
+
     try:
         data = json.loads(response)
-    except:
-        data = {"action": "unknown"}
+    except Exception as e:
+        print("❌ JSON ERROR:", response, e)
+        return {"action": "unknown"}
 
-    if not data:
-        print("❌ PARSER RETURNED NONE")
-        return "לא הבנתי 🤔"
+    if not data or "action" not in data:
+        print("❌ INVALID DATA:", data)
+        return {"action": "unknown"}
 
-    if "action" not in data:
-        print("❌ MISSING ACTION:", data)
-        return "לא הבנתי 🤔"
-
-    # 🔥 זיהוי חודש
+    # זיהוי חודש רק לסיכומים
     month = detect_month(text)
 
-    if month:
+    if month and data.get("action") == "get_summary":
         return {
             "action": "get_month_summary",
             "month": month,
