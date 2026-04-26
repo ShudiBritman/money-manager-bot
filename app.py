@@ -25,7 +25,7 @@ def whatsapp():
     <Message>{safe_reply}</Message>
 </Response>"""
 
-    return Response(twiml, mimetype="text/xml")
+    return Response(twiml, content_type="text/xml; charset=utf-8")
 
 
 if __name__ == "__main__":
