@@ -8,7 +8,10 @@ from datetime import datetime
 # -----------------------
 
 def get_conn():
-    return psycopg2.connect(os.environ.get("DATABASE_URL"))
+    return psycopg2.connect(
+        os.environ.get("DATABASE_URL"),
+        sslmode="require"
+    )
 
 
 def query(sql, params=None, fetch=False):
