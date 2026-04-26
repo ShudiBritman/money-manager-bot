@@ -144,20 +144,25 @@ def set_category_budget(category, amount):
 
 
 # -----------------------
-# 📌 הוצאות קבועות
+# 📌 הוצאות קבועות (עם ID!)
 # -----------------------
 
 def load_fixed():
     rows = query(
-        "SELECT amount, category, description FROM fixed_expenses",
+        """
+        SELECT id, amount, category, description
+        FROM fixed_expenses
+        ORDER BY id ASC
+        """,
         fetch=True
     ) or []
 
     return [
         {
-            "amount": float(r[0]),
-            "category": r[1],
-            "description": r[2]
+            "id": r[0],
+            "amount": float(r[1]),
+            "category": r[2],
+            "description": r[3]
         }
         for r in rows
     ]
@@ -177,12 +182,64 @@ def add_fixed_expense(expense):
     )
 
 
+def delete_fixed_expense(expense_id):
+    row = query(
+        """
+        SELECT id, amount, category, description
+        FROM fixed_expenses
+        WHERE id = %s
+        """,
+        (expense_id,),
+        fetch=True
+    )
+
+    if not row:
+        return None
+
+    query("DELETE FROM fixed_expenses WHERE id = %s", (expense_id,))
+
+    r = row[0]
+    return {
+        "id": r[0],
+        "amount": float(r[1]),
+        "category": r[2],
+        "description": r[3]
+    }
+
+
 def get_fixed_expenses():
     return load_fixed()
 
 
 def reset_fixed_expenses():
     query("DELETE FROM fixed_expenses")
+
+
+# -----------------------
+# 📂 קטגוריות מותאמות אישית
+# -----------------------
+
+def add_category(name):
+    if not name:
+        return
+
+    query(
+        """
+        INSERT INTO categories (name)
+        VALUES (%s)
+        ON CONFLICT (name) DO NOTHING
+        """,
+        (name,)
+    )
+
+
+def get_categories():
+    rows = query(
+        "SELECT name FROM categories",
+        fetch=True
+    ) or []
+
+    return [r[0] for r in rows]
 
 
 # -----------------------
@@ -221,7 +278,7 @@ def get_summary_by_month_db(year, month, category=None):
     total = sum(float(r[1]) for r in rows)
     categories = {r[0]: float(r[1]) for r in rows}
 
-    # ➕ הוצאות קבועות
+    # ➕ קבועות
     for f in get_fixed_expenses():
         if category and f["category"] != category:
             continue
@@ -233,7 +290,7 @@ def get_summary_by_month_db(year, month, category=None):
 
 
 # -----------------------
-# 🧠 LEARNING (משופר)
+# 🧠 LEARNING
 # -----------------------
 
 def learn_words(words, category):
@@ -246,7 +303,6 @@ def learn_words(words, category):
             with conn.cursor() as cur:
                 for word in set(words):
 
-                    # ❌ סינון מילים גרועות גם בצד DB
                     if len(word) < 3 or word.isdigit():
                         continue
 
@@ -265,6 +321,7 @@ def learn_words(words, category):
         conn.close()
 
 
+
 def get_learning_scores(words):
     if not words:
         return {}
@@ -281,3 +338,42 @@ def get_learning_scores(words):
     ) or []
 
     return {r[0]: float(r[1]) for r in rows}
+
+
+
+def load_fixed():
+    rows = query(
+        "SELECT id, amount, category, description FROM fixed_expenses",
+        fetch=True
+    ) or []
+
+    return [
+        {
+            "id": r[0],
+            "amount": float(r[1]),
+            "category": r[2],
+            "description": r[3]
+        }
+        for r in rows
+    ]
+
+
+def delete_fixed_expense_by_id(expense_id):
+    row = query(
+        "SELECT id, amount, category, description FROM fixed_expenses WHERE id = %s",
+        (expense_id,),
+        fetch=True
+    )
+
+    if not row:
+        return None
+
+    query("DELETE FROM fixed_expenses WHERE id = %s", (expense_id,))
+
+    r = row[0]
+    return {
+        "id": r[0],
+        "amount": float(r[1]),
+        "category": r[2],
+        "description": r[3]
+    }

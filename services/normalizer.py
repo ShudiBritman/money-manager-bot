@@ -1,9 +1,10 @@
 from services.learning import predict_category_with_confidence
+from storage.db import get_categories
 import difflib
 import re
 
 
-VALID_CATEGORIES = [
+DEFAULT_CATEGORIES = [
     "אוכל",
     "אוכל בחוץ",
     "תחבורה",
@@ -31,67 +32,86 @@ KEYWORDS = {
 }
 
 
+def get_all_categories():
+    try:
+        custom = get_categories() or []
+    except:
+        custom = []
+
+    return list(set(DEFAULT_CATEGORIES + custom))
+
+
 def tokenize(text):
     return re.findall(r'\w+', text.lower())
 
 
 def normalize_category(category, description=""):
 
-    # 🔥 הגנה מקריסה
+    # 🔥 הגנות
     if category is None:
         category = ""
 
     if description is None:
         description = ""
 
+    ALL_CATEGORIES = get_all_categories()
+
     text = f"{category} {description}".lower()
     words = tokenize(text)
 
-    scores = {cat: 0 for cat in VALID_CATEGORIES}
+    scores = {cat: 0 for cat in ALL_CATEGORIES}
 
     # -----------------------
     # 🔹 1. מילות מפתח (חזק מאוד)
     # -----------------------
     for cat, kw_list in KEYWORDS.items():
+        if cat not in scores:
+            continue
+
         for kw in kw_list:
             if kw in text:
                 scores[cat] += 3
 
     # -----------------------
-    # 🔹 2. למידה מה־DB
+    # 🔹 2. למידה מה־DB (חזק מאוד)
     # -----------------------
     predicted, confidence = predict_category_with_confidence(description)
 
-    if predicted and predicted in VALID_CATEGORIES:
-        scores[predicted] += confidence * 5
+    if predicted and predicted in scores:
+        scores[predicted] += confidence * 6  # חיזוק!
 
     # -----------------------
-    # 🔹 3. קטגוריה מה-GPT (חלש)
+    # 🔹 3. קטגוריה מה-GPT
     # -----------------------
-    if category in VALID_CATEGORIES:
+    if category in scores:
         scores[category] += 1.5
 
     # -----------------------
     # 🔹 4. תיקון שגיאות כתיב
     # -----------------------
     if category:
-        match = difflib.get_close_matches(category, VALID_CATEGORIES, n=1, cutoff=0.6)
+        match = difflib.get_close_matches(category, ALL_CATEGORIES, n=1, cutoff=0.6)
         if match:
             scores[match[0]] += 1
 
     # -----------------------
-    # 🔹 5. בחירת הכי חזק
+    # 🔹 5. fallback חכם לפי מילים
+    # -----------------------
+    for word in words:
+        for cat in ALL_CATEGORIES:
+            if word == cat:
+                scores[cat] += 2
+
+    # -----------------------
+    # 🔹 6. בחירה
     # -----------------------
     best = max(scores, key=scores.get)
     best_score = scores[best]
 
-    # -----------------------
-    # ❗ אין ביטחון → תשאל את המשתמש
-    # -----------------------
+    # ❗ אין ביטחון → תשאל
     if best_score < 2:
         return None, 0
 
-    # 🔥 נרמול confidence
     total_score = sum(scores.values())
     confidence = best_score / total_score if total_score > 0 else 0
 
