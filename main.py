@@ -17,7 +17,8 @@ from storage.db import (
 )
 from logic.summary import (
     get_monthly_summary,
-    get_category_total
+    get_category_total,
+    get_summary_by_month
 )
 
 
@@ -241,6 +242,29 @@ def handle(text):
         result += f"\nסה״כ חודשי קבוע: {total}₪"
 
         return result
+    
+
+    elif action == "get_month_summary":
+        month = data.get("month")
+        category = data.get("category")
+
+        result = get_summary_by_month(month, category)
+
+        if not result:
+            return "לא זיהיתי את החודש 🤔"
+
+        total, categories = result
+
+        if total == 0:
+            return f"📅 {month}:\nאין הוצאות בחודש הזה"
+
+        msg = f"📅 סיכום {month}:\n"
+        msg += f"סה״כ: {total}₪\n\n"
+
+        for k, v in categories.items():
+            msg += f"{k}: {v}₪\n"
+
+        return msg
 
     # =========================
     # 🤷 fallback

@@ -32,7 +32,7 @@ def apply_fixed_expenses(data):
             e.get("description") == f["description"]
             and e.get("amount") == f["amount"]
             and e.get("category") == f["category"]
-            and e.get("date")
+            and "date" in e
             and start <= datetime.fromisoformat(e["date"]) < end
             for e in data
         )
@@ -101,6 +101,71 @@ def get_category_total(category):
             total += float(e.get("amount", 0))
 
     return total
+
+# -----------------------
+# סיכום לפי חודש
+# -----------------------
+
+def get_month_range_by_name(month_name):
+    months = {
+        "ינואר": 1,
+        "פברואר": 2,
+        "מרץ": 3,
+        "אפריל": 4,
+        "מאי": 5,
+        "יוני": 6,
+        "יולי": 7,
+        "אוגוסט": 8,
+        "ספטמבר": 9,
+        "אוקטובר": 10,
+        "נובמבר": 11,
+        "דצמבר": 12
+    }
+
+    month = months.get(month_name)
+
+    if not month:
+        return None, None
+
+    now = datetime.now()
+    start = datetime(now.year, month, 1)
+
+    if month == 12:
+        end = datetime(now.year + 1, 1, 1)
+    else:
+        end = datetime(now.year, month + 1, 1)
+
+    return start, end
+
+def get_summary_by_month(month_name, category=None):
+    data = load_data()
+    data = apply_fixed_expenses(data)
+
+    start, end = get_month_range_by_name(month_name)
+
+    if not start:
+        return None
+
+    total = 0
+    categories = {}
+
+    for e in data:
+        try:
+            d = datetime.fromisoformat(e["date"])
+        except:
+            continue
+
+        if start <= d < end:
+            if category and e.get("category") != category:
+                continue
+
+            amount = float(e.get("amount", 0))
+            cat = e.get("category", "אחר")
+
+            total += amount
+            categories[cat] = categories.get(cat, 0) + amount
+
+    return total, categories
 
 
 # -----------------------

@@ -1,6 +1,18 @@
 import json
 from .openai_service import ask_gpt
 
+MONTHS = [
+    "ינואר","פברואר","מרץ","אפריל","מאי","יוני",
+    "יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"
+]
+
+def detect_month(text):
+    for m in MONTHS:
+        if m in text:
+            return m
+    return None 
+
+
 def parse_message(text):
     messages = [
     {
@@ -85,6 +97,12 @@ def parse_message(text):
 {
  "action": "reset_fixed_expenses"
 }
+13. סיכום לפי חודש:
+{
+ "action": "get_month_summary",
+ "month": "שם חודש בעברית",
+ "category": "אופציונלי"
+}
 
 חוקים:
 - להבין עברית חופשית
@@ -103,6 +121,20 @@ def parse_message(text):
     response = ask_gpt(messages)
 
     try:
-        return json.loads(response)
+        data = json.loads(response)
     except:
-        return {"action": "unknown"}
+        data = {"action": "unknown"}
+
+    # 🔥 זיהוי חודש
+    month = detect_month(text)
+
+    if month:
+        return {
+            "action": "get_month_summary",
+            "month": month,
+            "category": data.get("category")
+        }
+
+    return data
+    
+
