@@ -126,7 +126,6 @@ def parse_message(text):
     response = ask_gpt(messages)
 
     logger.info(f"RAW GPT RESPONSE: {response}")
-    
     if not response:
         return {"action": "unknown"}
 
