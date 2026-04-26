@@ -1,9 +1,16 @@
-import json
+import psycopg2
+import os
 from datetime import datetime
 
-FILE = "storage/expenses.json"
-BUDGET_FILE = "storage/budget.json"
-FIXED_FILE = "storage/fixed_expenses.json"
+conn = psycopg2.connect(os.environ.get("DATABASE_URL"))
+
+
+def query(sql, params=None, fetch=False):
+    with conn.cursor() as cur:
+        cur.execute(sql, params or ())
+        if fetch:
+            return cur.fetchall()
+        conn.commit()
 
 
 # -----------------------
@@ -11,114 +18,148 @@ FIXED_FILE = "storage/fixed_expenses.json"
 # -----------------------
 
 def load_data():
-    try:
-        with open(FILE, "r", encoding="utf-8") as f:            return json.load(f)
-    except:
-        return []
+    rows = query(
+        "SELECT amount, category, description, date FROM expenses ORDER BY date ASC",
+        fetch=True
+    )
 
-
-def save_data(data):
-    with open(FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+    return [
+        {
+            "amount": r[0],
+            "category": r[1],
+            "description": r[2],
+            "date": r[3].isoformat()
+        }
+        for r in rows
+    ]
 
 
 def save_expense(expense):
-    data = load_data()
-
-    expense["date"] = datetime.now().isoformat()
-    data.append(expense)
-
-    save_data(data)
+    query(
+        """
+        INSERT INTO expenses (amount, category, description, date)
+        VALUES (%s, %s, %s, %s)
+        """,
+        (
+            expense["amount"],
+            expense["category"],
+            expense["description"],
+            datetime.now()
+        )
+    )
 
 
 def delete_last_expense():
-    data = load_data()
+    row = query(
+        """
+        SELECT id, amount, category FROM expenses
+        ORDER BY date DESC LIMIT 1
+        """,
+        fetch=True
+    )
 
-    if not data:
+    if not row:
         return None
 
-    last = data.pop()
-    save_data(data)
+    expense_id, amount, category = row[0]
 
-    return last
+    query("DELETE FROM expenses WHERE id = %s", (expense_id,))
+
+    return {
+        "amount": amount,
+        "category": category
+    }
+
 
 def reset_expenses():
-    # מוחק את כל ההוצאות
-    with open(FILE, "w", encoding="utf-8") as f:
-        json.dump([], f, indent=2)
+    query("DELETE FROM expenses")
 
 
 # -----------------------
 # 💰 תקציב
 # -----------------------
 
-def load_budget():
-    try:
-        with open(BUDGET_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
+def get_budget():
+    row = query(
+        "SELECT monthly_budget FROM budget LIMIT 1",
+        fetch=True
+    )
+
+    if not row:
         return {
             "monthly_budget": 0,
             "categories": {}
         }
 
+    categories = query(
+        "SELECT category, amount FROM category_budget",
+        fetch=True
+    )
 
-def save_budget(data):
-    with open(BUDGET_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
-
-
-def get_budget():
-    return load_budget()
+    return {
+        "monthly_budget": row[0][0],
+        "categories": {c[0]: c[1] for c in categories}
+    }
 
 
 def set_total_budget(amount):
-    data = load_budget()
-    data["monthly_budget"] = amount
-    save_budget(data)
+    query("DELETE FROM budget")
+    query(
+        "INSERT INTO budget (monthly_budget) VALUES (%s)",
+        (amount,)
+    )
 
 
 def set_category_budget(category, amount):
-    data = load_budget()
-    data["categories"][category] = amount
-    save_budget(data)
+    query(
+        """
+        INSERT INTO category_budget (category, amount)
+        VALUES (%s, %s)
+        ON CONFLICT (category)
+        DO UPDATE SET amount = EXCLUDED.amount
+        """,
+        (category, amount)
+    )
 
 
 # -----------------------
-# הוצאות קבועות
+# 📌 הוצאות קבועות
 # -----------------------
 
 def load_fixed():
-    try:
-        with open(FIXED_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return []
+    rows = query(
+        "SELECT amount, category, description FROM fixed_expenses",
+        fetch=True
+    )
 
-
-def save_fixed(data):
-   with open(FIXED_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+    return [
+        {
+            "amount": r[0],
+            "category": r[1],
+            "description": r[2]
+        }
+        for r in rows
+    ]
 
 
 def add_fixed_expense(expense):
-    data = load_fixed()
-
-    if any(f["description"] == expense["description"] for f in data):
-        return
-    new_expense = {
-        "amount": expense["amount"],
-        "category": expense["category"],
-        "description": expense["description"]
-    }
-
-    data.append(new_expense)
-    save_fixed(data)
+    query(
+        """
+        INSERT INTO fixed_expenses (amount, category, description)
+        VALUES (%s, %s, %s)
+        ON CONFLICT DO NOTHING
+        """,
+        (
+            expense["amount"],
+            expense["category"],
+            expense["description"]
+        )
+    )
 
 
 def get_fixed_expenses():
-    data = load_fixed()
-    return data if data else []
+    return load_fixed()
+
 
 def reset_fixed_expenses():
-    save_fixed([])
+    query("DELETE FROM fixed_expenses")

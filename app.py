@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request, Response
 from main import handle
 
 app = Flask(__name__)
@@ -10,11 +10,13 @@ def whatsapp():
     # 👉 הבוט שלך
     reply = handle(incoming_msg)
 
-    return f"""
-    <Response>
-        <Message>{reply}</Message>
-    </Response>
-    """
+    return Response(
+    f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Message>{reply}</Message>
+</Response>""",
+    mimetype="application/xml"
+)
 
 import os
 
