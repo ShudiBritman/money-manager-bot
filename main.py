@@ -125,7 +125,8 @@ def handle(text):
     # =========================
     # 🔁 השלמת קטגוריה חסרה
     # =========================
-    if pending and len(text.split()) <= 3:
+    if pending and pending.get("action") in ["add_expense", "add_fixed_expense"]:
+
         category_input = text.strip()
 
         category, confidence = normalize_category(category_input, "")
@@ -138,17 +139,16 @@ def handle(text):
 
         pending["category"] = category
 
-        description = pending.get("description") or text
+        description = pending.get("description") or ""
         pending["description"] = description
 
         save_expense(pending)
-
-        if confidence >= 0.8:
-            learn(description, category)
+        learn(description, category)
 
         clear_pending()
 
         return f"נשמר: {pending['amount']}₪ על {pending['description']} ({category})"
+
 
     # =========================
     # ➕ הוספת הוצאה
@@ -195,14 +195,23 @@ def handle(text):
         )
 
         if not category:
-            return "חסרה קטגוריה להוצאה קבועה"
+            data["description"] = description
+            data["type"] = "fixed"   # 👈 חשוב
+            set_pending(data)
+
+            return (
+                f"לא בטוח לאיזה קטגוריה לשייך 🤔\n"
+                f"הוצאה קבועה: {description} {data.get('amount')}₪\n\n"
+                "בחר קטגוריה:\n" +
+                " | ".join(VALID_CATEGORIES)
+            )
 
         data["category"] = category
         data["description"] = description
 
         add_fixed_expense(data)
 
-        return f"הוצאה קבועה נוספה: {description} {data['amount']}₪ ({category})"
+        return f"הוצאה קבועה נוספה: {description} {data['amount']}₪"
 
     elif action == "reset_fixed_expenses":
         set_pending({"action": "confirm_reset_fixed"})

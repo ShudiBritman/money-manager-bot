@@ -49,15 +49,14 @@ CANCEL_WORDS = ["בטל", "עזוב", "cancel", "stop", "תבטל"]
 # 🧠 מספרים במילים → ספרות (משופר!)
 # -----------------------
 def extract_number_from_text(text):
-    text = text.lower()
+    text = text.replace("ו", " ")
+    total = 0
 
-    # חיפוש לפי מילים שלמות בלבד
     for word, value in NUMBER_WORDS.items():
         if re.search(rf'\b{word}\b', text):
-            return value
+            total += value
 
-    return None
-
+    return total if total > 0 else None
 
 # -----------------------
 # 📚 טעינת זיכרון קטגוריות
@@ -161,15 +160,58 @@ def parse_message(text):
 
     text_lower = text.lower()
 
-    # =========================
-    # 🔥 יציאה מהלופ
-    # =========================
+    # ❌ יציאה מהלופ
     if any(re.search(rf'\b{w}\b', text_lower) for w in CANCEL_WORDS):
         return {"action": "cancel"}
 
-    # =========================
-    # ➕ הוספת קטגוריה
-    # =========================
+    # 📅 סיכום לפי חודש
+    month = detect_month(text_lower)
+    if "סיכום" in text_lower and month:
+        return {
+            "action": "get_month_summary",
+            "month": month
+        }
+
+    # 📂 סיכום לפי קטגוריה
+    if "סיכום" in text_lower:
+        for cat in ["אוכל", "אוכל בחוץ", "תחבורה", "דיור", "בגדים", "חשבונות", "בלתי צפוי", "כללי"]:
+            if cat in text_lower:
+                return {
+                    "action": "get_category",
+                    "category": cat
+                }
+
+    # 📊 סיכום כללי (fallback בלבד)
+    if "סיכום" in text_lower:
+        return {"action": "get_summary"}
+
+    # 🔄 איפוס
+    if "איפוס" in text_lower:
+        return {"action": "reset"}
+
+
+    # 📂 לפי קטגוריה
+    if "כמה הוצאתי על" in text_lower:
+        category = text_lower.replace("כמה הוצאתי על", "").strip()
+        return {
+            "action": "get_category",
+            "category": category
+        }
+
+    # 📊 כמה הוצאתי
+    if "כמה הוצאתי" in text_lower:
+        return {"action": "get_summary"}
+
+
+    # ❌ מחיקת קבועה לפי ID
+    if "קבוע" in text_lower and ("מחק" in text_lower or "תמחק" in text_lower):
+        match = re.search(r'\b(?:id\s*)?(\d+)\b', text_lower)
+        if match:
+            return {
+                "action": "delete_fixed_by_id",
+                "id": int(match.group(1))
+            }
+
     if "קטגוריה" in text_lower and ("הוסף" in text_lower or "תוסיף" in text_lower):
         name = re.sub(r'(תוסיף|הוסף|קטגוריה)', '', text_lower).strip()
 
@@ -215,6 +257,7 @@ add_category, cancel
         {"role": "user", "content": text}
     ]
 
+
     response = ask_gpt(messages)
     logger.info(f"RAW GPT RESPONSE: {response}")
 
@@ -237,35 +280,13 @@ add_category, cancel
         return {"action": "unknown"}
 
     if not data or "action" not in data:
-        return {"action": "unknown"}
+        return {"action": "unknown", "raw": response}
 
     # =========================
     # 🔢 תיקון מספר אם GPT פספס
     # =========================
     if number and not data.get("amount"):
         data["amount"] = number
-
-    # -----------------------
-    # 📅 חודש
-    # -----------------------
-    month = detect_month(text)
-    if month and data.get("action") == "get_summary":
-        return {
-            "action": "get_month_summary",
-            "month": month,
-            "category": data.get("category")
-        }
-
-    # -----------------------
-    # ❌ מחיקת הוצאה קבועה לפי ID
-    # -----------------------
-    match = re.search(r'\b(\d+)\b', text_lower)
-
-    if "קבוע" in text_lower and ("מחק" in text_lower or "תמחק" in text_lower) and match:
-        return {
-            "action": "delete_fixed_by_id",
-            "id": int(match.group(1))
-        }
 
 
     # -----------------------
