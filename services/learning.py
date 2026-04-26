@@ -30,21 +30,23 @@ def tokenize(text):
     filtered = []
 
     for w in words:
-        w = clean_word(w)
 
-        # ❌ ריק
-        if not w:
-            continue
-
-        # ❌ מספרים
-        if is_number(w):
+        # ❌ מספרים / מספר+אות
+        if any(char.isdigit() for char in w):
             continue
 
         # ❌ קצר מדי
         if len(w) < 3:
             continue
 
-        # ❌ מילים לא רלוונטיות
+        # ❌ קטגוריות עצמן
+        if w in {
+            "אוכל", "בגדים", "תחבורה", "דיור",
+            "חשבונות", "כללי", "בלתי", "צפוי"
+        }:
+            continue
+
+        # ❌ stopwords
         if w in STOPWORDS:
             continue
 

@@ -200,9 +200,6 @@ get_fixed_expenses, reset_fixed_expenses, get_month_summary
         if fixed:
             data["category"] = fixed
 
-            # ✅ לומד רק מילים נקיות
-            learn_category(text, fixed)
-
         else:
             # ❗ גורם למערכת לשאול את המשתמש
             data["category"] = None

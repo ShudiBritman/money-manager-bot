@@ -102,7 +102,7 @@ def handle(text):
         pending["description"] = description
 
         save_expense(pending)
-        learn(f"{category} {description}", category)
+        learn(description, category)
 
         clear_pending()
 
@@ -115,7 +115,7 @@ def handle(text):
         description = data.get("description") or text
 
         category, confidence = normalize_category(
-            data.get("category"),
+            None,
             description
         )
 
@@ -136,13 +136,12 @@ def handle(text):
 
         save_expense(data)
 
-        if description and category:
-            learn(f"{category} {description}", category)
-
         if confidence >= 0.8:
+            learn(description, category)
             return f"נשמר: {data['amount']}₪ על {description} ({category})"
-        else:
-            return f"נשמר: {data['amount']}₪ על {description} ({category}, {int(confidence*100)}%)"
+
+        return f"נשמר: {data['amount']}₪ על {description} ({category}, {int(confidence*100)}%)"
+
 
     # =========================
     # 📊 סיכום חודשי
