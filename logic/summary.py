@@ -2,7 +2,7 @@ import json
 import os
 import logging
 import re
-from .openai_service import ask_gpt
+from services.openai_service import ask_gpt
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
