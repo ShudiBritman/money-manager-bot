@@ -25,34 +25,12 @@ def is_number(w):
 
 
 def tokenize(text):
-    words = re.findall(r'\w+', text.lower())
+    words = re.findall(r'[א-ת]+', text.lower())
 
-    filtered = []
-
-    for w in words:
-
-        # ❌ מספרים / מספר+אות
-        if any(char.isdigit() for char in w):
-            continue
-
-        # ❌ קצר מדי
-        if len(w) < 3:
-            continue
-
-        # ❌ קטגוריות עצמן
-        if w in {
-            "אוכל", "בגדים", "תחבורה", "דיור",
-            "חשבונות", "כללי", "בלתי", "צפוי"
-        }:
-            continue
-
-        # ❌ stopwords
-        if w in STOPWORDS:
-            continue
-
-        filtered.append(w)
-
-    return filtered
+    return [
+        w for w in words
+        if len(w) >= 3 and w not in STOPWORDS
+    ]
 
 
 def learn(description, category):

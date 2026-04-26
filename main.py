@@ -33,6 +33,7 @@ YES = ["כן", "yes", "y", "ok", "אוקיי"]
 NO = ["לא", "no", "n"]
 CANCEL = ["בטל", "ביטול", "cancel", "stop"]
 
+
 # -----------------------
 # 🔢 מספרים במילים
 # -----------------------
@@ -50,6 +51,7 @@ HEBREW_NUMBERS = {
     "מאה": 100
 }
 
+
 def extract_amount_from_text(text):
     for word, num in HEBREW_NUMBERS.items():
         if word in text:
@@ -62,11 +64,20 @@ def handle(text):
     cleaned = text.strip().lower()
 
     # =========================
-    # ❌ CANCEL (תמיד עובד)
+    # ❌ CANCEL תמיד עובד
     # =========================
     if any(word in cleaned for word in CANCEL):
         clear_pending()
         return "בוטל 👍"
+
+    # =========================
+    # ⚡ סיכום מהיר לפי קטגוריה
+    # =========================
+    if "סיכום" in cleaned:
+        for cat in VALID_CATEGORIES:
+            if cat in cleaned:
+                total = get_category_total(cat)
+                return f"סה״כ על {cat}: {total}₪"
 
     # =========================
     # 🔥 CONFIRM RESET
@@ -85,6 +96,7 @@ def handle(text):
         return "לא הבנתי 🤔 כתוב כן או לא"
 
     if pending and pending.get("action") == "confirm_reset_fixed":
+
         if any(word in cleaned for word in YES):
             reset_fixed_expenses()
             clear_pending()
@@ -108,7 +120,7 @@ def handle(text):
     action = data.get("action")
 
     # =========================
-    # 🔢 השלמת סכום אם חסר
+    # 🔢 השלמת סכום
     # =========================
     if not data.get("amount"):
         amount = extract_amount_from_text(text)
@@ -118,18 +130,23 @@ def handle(text):
     # =========================
     # 🔥 יציאה מלופים
     # =========================
-    if pending and action not in ["add_expense"]:
+    if pending and action not in ["add_expense", "add_fixed_expense"]:
         clear_pending()
         pending = None
 
     # =========================
-    # 🔁 השלמת קטגוריה חסרה
+    # 🔁 השלמת קטגוריה (מילה אחת)
     # =========================
     if pending and pending.get("action") in ["add_expense", "add_fixed_expense"]:
 
         category_input = text.strip()
 
-        category, confidence = normalize_category(category_input, "")
+        # ✅ אם כתב קטגוריה ישירות
+        if category_input in VALID_CATEGORIES:
+            category = category_input
+            confidence = 1
+        else:
+            category, confidence = normalize_category(category_input, "")
 
         if not category:
             return (
@@ -142,18 +159,23 @@ def handle(text):
         description = pending.get("description") or ""
         pending["description"] = description
 
-        save_expense(pending)
+        # ❗ חשוב: אם זה fixed → לשמור נכון
+        if pending.get("type") == "fixed":
+            add_fixed_expense(pending)
+        else:
+            save_expense(pending)
+
         learn(description, category)
 
         clear_pending()
 
         return f"נשמר: {pending['amount']}₪ על {pending['description']} ({category})"
 
-
     # =========================
     # ➕ הוספת הוצאה
     # =========================
     if action == "add_expense":
+
         description = data.get("description") or text
 
         category, confidence = normalize_category(
@@ -179,15 +201,19 @@ def handle(text):
 
         if confidence >= 0.8:
             learn(description, category)
-            return f"נשמר: {data['amount']}₪ על {description} ({category})"
 
-        return f"נשמר: {data['amount']}₪ על {description} ({category}, {int(confidence*100)}%)"
+        return f"נשמר: {data['amount']}₪ על {description} ({category})"
 
     # =========================
     # 🔁 הוצאה קבועה
     # =========================
     elif action == "add_fixed_expense":
+
         description = data.get("description") or text
+
+        # ניקוי טקסט
+        for word in ["תוסיף", "הוצאה", "קבועה"]:
+            description = description.replace(word, "").strip()
 
         category, confidence = normalize_category(
             data.get("category"),
@@ -196,7 +222,7 @@ def handle(text):
 
         if not category:
             data["description"] = description
-            data["type"] = "fixed"   # 👈 חשוב
+            data["type"] = "fixed"  # ✅ קריטי
             set_pending(data)
 
             return (
@@ -218,7 +244,7 @@ def handle(text):
         return "למחוק את כל ההוצאות הקבועות? כתוב כן או לא"
 
     # =========================
-    # ❌ מחיקה
+    # ❌ מחיקה רגילה
     # =========================
     elif action == "delete_last":
         deleted = delete_last_expense()
@@ -229,39 +255,10 @@ def handle(text):
         return "אין מה למחוק"
 
     # =========================
-    # 📊 סיכום חודשי
-    # =========================
-    elif action == "get_summary":
-        total, categories = get_monthly_summary()
-        budget_data = get_budget()
-
-        total_budget = budget_data.get("monthly_budget", 0)
-
-        if total_budget == 0:
-            result = f"סה״כ החודש: {total}₪\n\n"
-        else:
-            remaining = total_budget - total
-            percent_used = int((total / total_budget) * 100)
-
-            result = f"סה״כ החודש: {total}₪\n"
-            result += f"תקציב: {total_budget}₪\n"
-
-            if remaining < 0:
-                result += f"חריגה: {abs(remaining)}₪ ⚠️ ({percent_used}% נוצל)\n"
-            else:
-                result += f"נשאר: {remaining}₪ ({percent_used}% נוצל)\n"
-
-            result += "\n"
-
-        for k, v in categories.items():
-            result += f"{k}: {v}₪\n"
-
-        return result
-
-    # =========================
     # 📌 קבועות
     # =========================
     elif action == "get_fixed_expenses":
+
         fixed = get_fixed_expenses()
 
         if not fixed:
@@ -278,29 +275,17 @@ def handle(text):
         return result
 
     # =========================
-    # ➕ הוספת קטגוריה
+    # ❌ מחיקת קבועה לפי ID
     # =========================
-    elif action == "add_category":
-        name = data.get("name")
-
-        if not name:
-            return "חסר שם קטגוריה"
-
-        add_category(name)
-        return f"נוספה קטגוריה: {name}"
-
-    # =========================
-    # מחיקת הוצאה קבועה
-    # =========================
-
     elif action == "delete_fixed_by_id":
-        expense_id = data.get("id")
 
-        if expense_id <= 0:
-            return "ID לא תקין"
+        expense_id = data.get("id")
 
         if not expense_id:
             return "לא זיהיתי ID 🤔"
+
+        if expense_id <= 0:
+            return "ID לא תקין"
 
         deleted = delete_fixed_expense_by_id(expense_id)
 
@@ -308,12 +293,30 @@ def handle(text):
             return f"לא נמצאה הוצאה עם ID {expense_id}"
 
         return f"נמחק: {deleted['description']} {deleted['amount']}₪"
+
+    # =========================
+    # 📊 סיכום חודשי
+    # =========================
+    elif action == "get_summary":
+
+        total, categories = get_monthly_summary()
+
+        result = f"סה״כ החודש: {total}₪\n\n"
+
+        for k, v in categories.items():
+            result += f"{k}: {v}₪\n"
+
+        return result
+
     # =========================
     # 📅 סיכום לפי חודש
     # =========================
     elif action == "get_month_summary":
+
         month_name = data.get("month")
-        category = data.get("category")
+        category_input = data.get("category")
+
+        category, _ = normalize_category(category_input, category_input)
 
         month = month_name_to_number(month_name)
 
@@ -333,7 +336,6 @@ def handle(text):
         return msg
 
     return "לא הבנתי 🤔"
-
 
 
 if __name__ == "__main__":
