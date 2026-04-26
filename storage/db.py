@@ -229,3 +229,28 @@ def get_summary_by_month_db(year, month, category=None):
         categories[f["category"]] = categories.get(f["category"], 0) + float(f["amount"])
 
     return total, categories
+
+
+def get_monthly_summary_db(start, end):
+    rows = query(
+        """
+        SELECT category, SUM(amount)
+        FROM expenses
+        WHERE date >= %s AND date < %s
+        GROUP BY category
+        """,
+        (start, end),
+        fetch=True
+    )
+
+    total = sum(float(r[1]) for r in rows) if rows else 0
+    categories = {r[0]: float(r[1]) for r in rows} if rows else {}
+
+    # ➕ הוצאות קבועות
+    fixed = get_fixed_expenses()
+
+    for f in fixed:
+        total += float(f["amount"])
+        categories[f["category"]] = categories.get(f["category"], 0) + float(f["amount"])
+
+    return total, categories

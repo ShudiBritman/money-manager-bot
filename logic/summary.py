@@ -1,4 +1,4 @@
-from storage.db import get_fixed_expenses, query
+from storage.db import get_fixed_expenses, query, get_monthly_summary_db
 from datetime import datetime
 
 
@@ -76,28 +76,7 @@ def apply_fixed_expenses(data, start, end):
 # -----------------------
 def get_monthly_summary():
     start, end = get_month_range()
-
-    data = load_data_by_range(start, end)
-    data = apply_fixed_expenses(data, start, end)
-
-    total = 0
-    categories = {}
-
-    for e in data:
-        try:
-            if not e.get("date"):
-                continue
-            datetime.fromisoformat(e["date"])
-        except:
-            continue
-
-        amount = float(e.get("amount", 0))
-        category = e.get("category", "אחר")
-
-        total += amount
-        categories[category] = categories.get(category, 0) + amount
-
-    return total, categories
+    return get_monthly_summary_db(start, end)
 
 
 # -----------------------
@@ -106,26 +85,9 @@ def get_monthly_summary():
 def get_category_total(category):
     start, end = get_month_range()
 
-    rows = query(
-        """
-        SELECT SUM(amount)
-        FROM expenses
-        WHERE category = %s
-        AND date >= %s AND date < %s
-        """,
-        (category, start, end),
-        fetch=True
-    )
+    total, categories = get_monthly_summary_db(start, end)
 
-    total = float(rows[0][0]) if rows and rows[0][0] else 0
-
-    # ➕ הוספת הוצאות קבועות
-    fixed = get_fixed_expenses()
-    for f in fixed:
-        if f["category"] == category:
-            total += float(f["amount"])
-
-    return total
+    return categories.get(category, 0)
 
 
 # -----------------------
