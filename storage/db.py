@@ -10,7 +10,8 @@ from datetime import datetime
 def get_conn():
     return psycopg2.connect(
         os.environ.get("DATABASE_URL"),
-        sslmode="require"
+        sslmode="require",
+        connect_timeout=5
     )
 
 
@@ -22,8 +23,11 @@ def query(sql, params=None, fetch=False):
                 cur.execute(sql, params or ())
                 if fetch:
                     return cur.fetchall()
+    except Exception as e:
+        print("❌ DB ERROR:", e)
+        return [] if fetch else None
     finally:
-        conn.close()  # ✅ חשוב מאוד
+        conn.close()
 
 
 # -----------------------
@@ -38,7 +42,7 @@ def load_data():
         ORDER BY date ASC
         """,
         fetch=True
-    )
+    ) or []
 
     return [
         {
@@ -60,7 +64,7 @@ def save_expense(expense):
         (
             float(expense["amount"]),
             expense["category"],
-            expense["description"],
+            expense.get("description", ""),
             datetime.now()
         )
     )
@@ -105,19 +109,13 @@ def get_budget():
         fetch=True
     )
 
-    if not row:
-        return {
-            "monthly_budget": 0,
-            "categories": {}
-        }
-
     categories = query(
         "SELECT category, amount FROM category_budget",
         fetch=True
-    )
+    ) or []
 
     return {
-        "monthly_budget": float(row[0][0]),
+        "monthly_budget": float(row[0][0]) if row else 0,
         "categories": {c[0]: float(c[1]) for c in categories}
     }
 
@@ -150,7 +148,7 @@ def load_fixed():
     rows = query(
         "SELECT amount, category, description FROM fixed_expenses",
         fetch=True
-    )
+    ) or []
 
     return [
         {
@@ -167,12 +165,11 @@ def add_fixed_expense(expense):
         """
         INSERT INTO fixed_expenses (amount, category, description)
         VALUES (%s, %s, %s)
-        ON CONFLICT DO NOTHING
         """,
         (
             float(expense["amount"]),
             expense["category"],
-            expense["description"]
+            expense.get("description", "")
         )
     )
 
@@ -186,7 +183,7 @@ def reset_fixed_expenses():
 
 
 # -----------------------
-# 📊 סיכום לפי חודש (DB)
+# 📊 סיכום
 # -----------------------
 
 def get_summary_by_month_db(year, month, category=None):
@@ -216,15 +213,13 @@ def get_summary_by_month_db(year, month, category=None):
             fetch=True
         )
 
-    total = sum(float(r[1]) for r in rows) if rows else 0
-    categories = {r[0]: float(r[1]) for r in rows} if rows else {}
+    rows = rows or []
 
-    # -----------------------
-    # ➕ הוספת הוצאות קבועות
-    # -----------------------
-    fixed = get_fixed_expenses()
+    total = sum(float(r[1]) for r in rows)
+    categories = {r[0]: float(r[1]) for r in rows}
 
-    for f in fixed:
+    # ➕ הוצאות קבועות
+    for f in get_fixed_expenses():
         if category and f["category"] != category:
             continue
 
@@ -234,26 +229,47 @@ def get_summary_by_month_db(year, month, category=None):
     return total, categories
 
 
-def get_monthly_summary_db(start, end):
+# -----------------------
+# 🧠 LEARNING (משופר!)
+# -----------------------
+
+def learn_words(words, category):
+    if not words:
+        return
+
+    conn = get_conn()
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                for word in set(words):  # בלי כפילויות
+                    cur.execute(
+                        """
+                        INSERT INTO learning (word, category, count, updated_at)
+                        VALUES (%s, %s, 1, NOW())
+                        ON CONFLICT (word, category)
+                        DO UPDATE SET
+                            count = learning.count + 1,
+                            updated_at = NOW()
+                        """,
+                        (word, category)
+                    )
+    finally:
+        conn.close()
+
+
+def get_learning_scores(words):
+    if not words:
+        return {}
+
     rows = query(
         """
-        SELECT category, SUM(amount)
-        FROM expenses
-        WHERE date >= %s AND date < %s
+        SELECT category, SUM(count)
+        FROM learning
+        WHERE word = ANY(%s)
         GROUP BY category
         """,
-        (start, end),
+        (list(set(words)),),
         fetch=True
-    )
+    ) or []
 
-    total = sum(float(r[1]) for r in rows) if rows else 0
-    categories = {r[0]: float(r[1]) for r in rows} if rows else {}
-
-    # ➕ הוצאות קבועות
-    fixed = get_fixed_expenses()
-
-    for f in fixed:
-        total += float(f["amount"])
-        categories[f["category"]] = categories.get(f["category"], 0) + float(f["amount"])
-
-    return total, categories
+    return {r[0]: r[1] for r in rows}

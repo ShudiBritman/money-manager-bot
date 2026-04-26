@@ -1,23 +1,96 @@
 import json
-from .openai_service import ask_gpt
-
+import os
 import logging
+from .openai_service import ask_gpt
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+MEMORY_FILE = "storage/category_memory.json"
 
 MONTHS = [
     "ינואר","פברואר","מרץ","אפריל","מאי","יוני",
     "יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"
 ]
 
+
+# -----------------------
+# 📚 טעינת זיכרון קטגוריות
+# -----------------------
+def load_memory():
+    if not os.path.exists(MEMORY_FILE):
+        return {}
+    try:
+        with open(MEMORY_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return {}
+
+
+def save_memory(memory):
+    with open(MEMORY_FILE, "w", encoding="utf-8") as f:
+        json.dump(memory, f, ensure_ascii=False, indent=2)
+
+
+# -----------------------
+# 🧠 למידה
+# -----------------------
+def learn_category(text, category):
+    memory = load_memory()
+    words = text.lower().split()
+
+    for w in words:
+        if len(w) < 3:
+            continue
+        memory[w] = category
+
+    save_memory(memory)
+
+
+# -----------------------
+# 🔧 תיקון קטגוריה חכם
+# -----------------------
+def fix_category(text, category):
+    text_lower = text.lower()
+    memory = load_memory()
+
+    # 1. זיכרון קודם
+    for word, cat in memory.items():
+        if word in text_lower:
+            return cat
+
+    # 2. חוקים קשיחים
+    if any(w in text_lower for w in ["חולצה", "מכנס", "נעל", "בגד"]):
+        return "בגדים"
+
+    if any(w in text_lower for w in ["אוכל", "קפה", "מסעדה", "פיצה", "סופר"]):
+        return "אוכל"
+
+    if any(w in text_lower for w in ["דלק", "אוטובוס", "רכבת", "מונית"]):
+        return "תחבורה"
+
+    if any(w in text_lower for w in ["שכירות", "משכנתא"]):
+        return "דיור"
+
+    if any(w in text_lower for w in ["חשמל", "מים", "אינטרנט", "טלפון"]):
+        return "חשבונות"
+
+    return category
+
+
+# -----------------------
+# 📅 זיהוי חודש
+# -----------------------
 def detect_month(text):
     for m in MONTHS:
         if m in text:
             return m
-    return None 
+    return None
 
 
+# -----------------------
+# 🧠 ניתוח הודעה
+# -----------------------
 def parse_message(text):
     messages = [
     {
@@ -27,112 +100,49 @@ def parse_message(text):
 
 תחזיר JSON בלבד.
 
+אם אינך בטוח בקטגוריה → בחר "כללי".
+
 פעולות:
 
-1. הוספת הוצאה:
-{
- "action": "add_expense",
- "amount": number,
- "category": "בגדים |בלתי צפוי | אוכל | תחבורה | דיור | חשבונות | כללי | אוכל בחוץ"
- "description": string
-}
+1. add_expense
+2. add_fixed_expense
+3. get_summary
+4. get_category
+5. delete_last
+6. set_total_budget
+7. set_category_budget
+8. remaining_total
+9. remaining_category
+10. reset
+11. get_fixed_expenses
+12. reset_fixed_expenses
+13. get_month_summary
 
-2. הוספת הוצאה קבועה:
-{
- "action": "add_fixed_expense",
- "amount": number,
- "category": "אוכל | תחבורה | דיור | בגדים | חשבונות | בלתי צפוי | כללי | אוכל בחוץ",
- "description": string
-}
-
-3. סיכום חודשי:
-{
- "action": "get_summary"
-}
-
-4. סיכום לפי קטגוריה:
-{
- "action": "get_category",
- "category": string
-}
-
-5. מחיקת הוצאה:
-{
- "action": "delete_last"
-}
-
-6. הגדרת תקציב כללי:
-{
- "action": "set_total_budget",
- "amount": number
-}
-
-7. הגדרת תקציב קטגוריה:
-{
- "action": "set_category_budget",
- "category": string,
- "amount": number
-}
-
-8. כמה נשאר כללי:
-{
- "action": "remaining_total"
-}
-
-9. כמה נשאר בקטגוריה:
-{
- "action": "remaining_category",
- "category": string
-}
-
-10. לא מובן:
-{
- "action": "unknown"
-}
-
-10. איפוס נתונים:
-{
- "action": "reset"
-}
-11. הצגת הוצאות קבועות:
-{
- "action": "get_fixed_expenses"
-}
-12. איפוס הוצאות קבועות:
-{
- "action": "reset_fixed_expenses"
-}
-13. סיכום לפי חודש:
-{
- "action": "get_month_summary",
- "month": "שם חודש בעברית",
- "category": "אופציונלי"
-}
+קטגוריות מותרות בלבד:
+בגדים, אוכל, תחבורה, דיור, חשבונות, כללי, בלתי צפוי, אוכל בחוץ
 
 חוקים:
-- להבין עברית חופשית
-- לזהות סכומים גם בתוך משפט
-- לבחור קטגוריה מתאימה
-- לזהות משפטים כמו "התקציב שלי 5000"
-- לזהות "כמה נשאר לי"
-- להבין "תקציב אוכל 1500"
-- להבין "כמה נשאר לי באוכל"
 - תמיד להחזיר JSON בלבד
+- לא להחזיר טקסט נוסף
+- לזהות סכומים מתוך משפט
 """
     },
     {"role": "user", "content": text}
 ]
 
     response = ask_gpt(messages)
-
     logger.info(f"RAW GPT RESPONSE: {response}")
+
     if not response:
         return {"action": "unknown"}
 
     response = response.strip()
 
+    # ניקוי קוד בלוקים
     if response.startswith("```"):
-        response = response.split("```")[1]
+        parts = response.split("```")
+        if len(parts) > 1:
+            response = parts[1]
 
     response = response.replace("json", "").strip()
 
@@ -143,12 +153,13 @@ def parse_message(text):
         return {"action": "unknown"}
 
     if not data or "action" not in data:
-        logger.error(f"PARSER ERROR: {e}")
+        logger.error("INVALID RESPONSE STRUCTURE")
         return {"action": "unknown"}
 
-    # זיהוי חודש רק לסיכומים
+    # -----------------------
+    # 📅 חודש
+    # -----------------------
     month = detect_month(text)
-
     if month and data.get("action") == "get_summary":
         return {
             "action": "get_month_summary",
@@ -156,6 +167,16 @@ def parse_message(text):
             "category": data.get("category")
         }
 
-    return data
-    
+    # -----------------------
+    # 🔧 תיקון ולמידה
+    # -----------------------
+    if data.get("action") in ["add_expense", "add_fixed_expense"]:
+        original_category = data.get("category", "כללי")
 
+        fixed = fix_category(text, original_category)
+        data["category"] = fixed
+
+        # למידה
+        learn_category(text, fixed)
+
+    return data

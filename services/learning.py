@@ -1,54 +1,32 @@
-import json
-
-FILE = "storage/learning.json"
-
-
-def load_learning():
-    try:
-        with open(FILE, "r") as f:
-            return json.load(f)
-    except:
-        return {}
+from storage.db import learn_words, get_learning_scores
+import re
 
 
-def save_learning(data):
-    with open(FILE, "w") as f:
-        json.dump(data, f, indent=2)
+def tokenize(text):
+    return re.findall(r'\w+', text.lower())
 
 
 def learn(description, category):
-    data = load_learning()
-
-    words = description.lower().split()
-
-    for word in words:
-        if word not in data:
-            data[word] = {}
-
-        if category not in data[word]:
-            data[word][category] = 0
-
-        data[word][category] += 1
-
-    save_learning(data)
+    words = tokenize(description)
+    if not words:
+        return
+    learn_words(words, category)
 
 
 def predict_category_with_confidence(description):
-    data = load_learning()
-    scores = {}
+    words = tokenize(description)
 
-    words = description.lower().split()
+    if not words:
+        return None, 0
 
-    for word in words:
-        if word in data:
-            for cat, count in data[word].items():
-                scores[cat] = scores.get(cat, 0) + count
+    scores = get_learning_scores(words)
 
     if not scores:
         return None, 0
 
     best = max(scores, key=scores.get)
     total = sum(scores.values())
+
     confidence = scores[best] / total if total > 0 else 0
 
     return best, confidence

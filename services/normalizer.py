@@ -1,5 +1,6 @@
 from services.learning import predict_category_with_confidence
 import difflib
+import re
 
 
 VALID_CATEGORIES = [
@@ -14,46 +15,57 @@ VALID_CATEGORIES = [
 ]
 
 
-# 🔥 סדר חשוב: קודם קטגוריות יותר ספציפיות
 KEYWORDS = {
     "אוכל בחוץ": [
         "מסעדה", "פיצה", "המבורגר", "שווארמה",
-        "סושי", "גלידה", "אייס קפה", "קפה"
+        "סושי", "גלידה", "אייס", "קפה"
     ],
     "אוכל": [
-        "סופר", "מזון", "קניות אוכל", "מצרכים", "שפע", "שפע ברכת ה'"
+        "סופר", "מזון", "מצרכים"
     ],
     "תחבורה": ["דלק", "אוטובוס", "רכבת", "מונית"],
     "דיור": ["שכירות", "דירה", "משכנתא"],
     "בגדים": ["בגדים", "חולצה", "נעליים", "זארה", "nike"],
     "חשבונות": ["חשמל", "מים", "ארנונה", "אינטרנט", "טלפון"],
-    "בלתי צפוי": [
-        "תיקון", "קלקול", "רופא", "קנס",
-        "בעיה", "שבר", "החלפה", "פתאום",
-        "נשבר", "תקלה"
-    ]
+    "בלתי צפוי": ["תיקון", "קלקול", "רופא", "קנס", "תקלה"]
 }
+
+
+def tokenize(text):
+    return re.findall(r'\w+', text.lower())
 
 
 def normalize_category(category, description=""):
     text = f"{category} {description}".lower()
+    words = tokenize(text)
 
-    # 🔹 1. למידה (הכי חזק)
+    scores = {cat: 0 for cat in VALID_CATEGORIES}
+
+    # 🔹 1. מילות מפתח (חזק מאוד)
+    for cat, kw_list in KEYWORDS.items():
+        for kw in kw_list:
+            if kw in text:
+                scores[cat] += 3  # משקל גבוה
+
+    # 🔹 2. למידה מה־DB
     predicted, confidence = predict_category_with_confidence(description)
-    if predicted and predicted in VALID_CATEGORIES and confidence >= 0.7:
-        return predicted, confidence
+    if predicted and predicted in VALID_CATEGORIES:
+        scores[predicted] += confidence * 5  # משקל דינמי
 
-    # 🔹 2. מילות מפתח (לפי סדר!)
-    for cat, words in KEYWORDS.items():
-        for word in words:
-            if word in text:
-                return cat, 0.85
+    # 🔹 3. התאמה לפי קטגוריה שהגיעה מה־GPT
+    if category in VALID_CATEGORIES:
+        scores[category] += 1.5
 
-    # 🔹 3. תיקון שגיאות כתיב
+    # 🔹 4. תיקון שגיאות כתיב
     match = difflib.get_close_matches(category, VALID_CATEGORIES, n=1, cutoff=0.6)
     if match:
-        return match[0], 0.7
-    
+        scores[match[0]] += 1
 
-    # 🔹 4. fallback
-    return None, 0.0
+    # 🔹 5. בחירת הכי חזק
+    best = max(scores, key=scores.get)
+    best_score = scores[best]
+
+    if best_score == 0:
+        return "כללי", 0.3
+
+    return best, best_score
