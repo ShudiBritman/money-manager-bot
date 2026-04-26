@@ -1,24 +1,24 @@
 from services.parser import parse_message
+from datetime import datetime
 from storage.db import (
     add_fixed_expense,
     reset_expenses,
     get_fixed_expenses,
-    reset_fixed_expenses
-)
-from services.pending import set_pending, get_pending, clear_pending
-from services.learning import learn
-from services.normalizer import normalize_category
-from storage.db import (
+    reset_fixed_expenses,
+    get_summary_by_month_db,
     set_total_budget,
     set_category_budget,
     get_budget,
     save_expense,
     delete_last_expense,
 )
+from services.pending import set_pending, get_pending, clear_pending
+from services.learning import learn
+from services.normalizer import normalize_category
 from logic.summary import (
     get_monthly_summary,
     get_category_total,
-    get_summary_by_month
+    month_name_to_number
 )
 
 
@@ -33,14 +33,12 @@ def handle(text):
     NO = ["לא", "no", "n"]
 
     # =========================
-    # 🔥 CONFIRM RESET (הכי ראשון)
+    # 🔥 CONFIRM RESET
     # =========================
     if pending and pending.get("action") == "confirm_reset":
 
-        
-
         if any(word in cleaned for word in YES):
-            reset_expenses()  # או reset_all אם בא לך למחוק גם תקציב
+            reset_expenses()
             clear_pending()
             return "נמחק הכל 🗑️"
 
@@ -49,26 +47,28 @@ def handle(text):
             return "בוטל"
 
         return "לא הבנתי 🤔 כתוב כן או לא"
-    
+
     if pending and pending.get("action") == "confirm_reset_fixed":
         if any(word in cleaned for word in YES):
             reset_fixed_expenses()
             clear_pending()
             return "כל ההוצאות הקבועות נמחקו 🗑️"
 
-        else:
+        if any(word in cleaned for word in NO):
             clear_pending()
             return "בוטל"
 
+        return "לא הבנתי 🤔 כתוב כן או לא"
+
     # =========================
-    # 🔥 אם המשתמש שלח הוצאה חדשה → בטל pending
+    # 🔥 ביטול pending אם זו הוצאה
     # =========================
     if pending and any(char.isdigit() for char in text):
         clear_pending()
         pending = None
 
     # =========================
-    # 🔁 טיפול ב-pending רגיל
+    # 🔁 השלמת קטגוריה חסרה
     # =========================
     if pending and len(text.split()) <= 3:
         category_input = text.strip()
@@ -114,7 +114,7 @@ def handle(text):
             set_pending(data)
             return (
                 f"לא בטוח לאיזה קטגוריה לשייך 🤔\n"
-                f"הוצאה: {data['description']} {data['amount']}₪\n\n"
+                f"הוצאה: {data.get('description')} {data.get('amount')}₪\n\n"
                 "בחר קטגוריה:\n" +
                 " | ".join(VALID_CATEGORIES)
             )
@@ -173,15 +173,15 @@ def handle(text):
         return f"סה״כ על {category}: {total}₪"
 
     # =========================
-    # 🔁 קבוע
+    # 🔁 הוצאה קבועה
     # =========================
     elif action == "add_fixed_expense":
         add_fixed_expense(data)
         return f"הוצאה קבועה נוספה: {data['description']} {data['amount']}₪"
-    
+
     elif action == "reset_fixed_expenses":
         set_pending({"action": "confirm_reset_fixed"})
-        return "למחוק את כל ההוצאות הקבועות? כתוב כן"
+        return "למחוק את כל ההוצאות הקבועות? כתוב כן או לא"
 
     # =========================
     # ❌ מחיקה
@@ -191,6 +191,7 @@ def handle(text):
 
         if deleted:
             return f"נמחקה הוצאה: {deleted['amount']}₪ ({deleted['category']})"
+
         return "אין מה למחוק"
 
     # =========================
@@ -226,7 +227,10 @@ def handle(text):
     elif action == "reset":
         set_pending({"action": "confirm_reset"})
         return "אתה בטוח שברצונך למחוק הכל? כתוב כן או לא"
-    
+
+    # =========================
+    # 📌 הצגת קבועות
+    # =========================
     elif action == "get_fixed_expenses":
         fixed = get_fixed_expenses()
 
@@ -238,27 +242,29 @@ def handle(text):
         for f in fixed:
             result += f"- {f['description']}: {f['amount']}₪ ({f['category']})\n"
 
-        total = sum(f["amount"] for f in fixed)
+        total = sum(float(f["amount"]) for f in fixed)
         result += f"\nסה״כ חודשי קבוע: {total}₪"
 
         return result
-    
 
+    # =========================
+    # 📅 סיכום לפי חודש (DB)
+    # =========================
     elif action == "get_month_summary":
-        month = data.get("month")
+
+        month_name = data.get("month")
         category = data.get("category")
 
-        result = get_summary_by_month(month, category)
+        month = month_name_to_number(month_name)
 
-        if not result:
+        if not month:
             return "לא זיהיתי את החודש 🤔"
 
-        total, categories = result
+        year = datetime.now().year
 
-        if total == 0:
-            return f"📅 {month}:\nאין הוצאות בחודש הזה"
+        total, categories = get_summary_by_month_db(year, month, category)
 
-        msg = f"📅 סיכום {month}:\n"
+        msg = f"📅 סיכום {month_name}:\n"
         msg += f"סה״כ: {total}₪\n\n"
 
         for k, v in categories.items():
@@ -270,7 +276,6 @@ def handle(text):
     # 🤷 fallback
     # =========================
     return "לא הבנתי 🤔"
-
 
 
 # ▶️ הרצה מקומית

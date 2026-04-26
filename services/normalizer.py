@@ -53,6 +53,7 @@ def normalize_category(category, description=""):
     match = difflib.get_close_matches(category, VALID_CATEGORIES, n=1, cutoff=0.6)
     if match:
         return match[0], 0.7
+    
 
     # 🔹 4. fallback
     return None, 0.0
