@@ -67,7 +67,7 @@ def handle(text):
     # =========================
     # 🔥 ביטול pending אם זו הוצאה
     # =========================
-    if pending and any(char.isdigit() for char in text):
+    if pending and parse_message(text).get("action") == "add_expense":
         clear_pending()
         pending = None
 
@@ -77,7 +77,7 @@ def handle(text):
     if pending and len(text.split()) <= 3:
         category_input = text.strip()
 
-        category, confidence = normalize_category(category_input, category_input)
+        category, confidence = normalize_category(category_input, "")
 
         if not category:
             clear_pending()
@@ -88,8 +88,11 @@ def handle(text):
 
         pending["category"] = category
 
+        description = pending.get("description") or text
+        pending["description"] = description
+
         save_expense(pending)
-        learn(pending["description"], category)
+        learn(f"{category} {description}", category)
 
         clear_pending()
 
@@ -110,26 +113,37 @@ def handle(text):
     # ➕ הוספת הוצאה
     # =========================
     if action == "add_expense":
+        description = data.get("description") or text
+
         category, confidence = normalize_category(
             data.get("category", ""),
-            data.get("description", "")
+            description
         )
 
         if not category:
+            data["description"] = description
             set_pending(data)
+
             return (
                 f"לא בטוח לאיזה קטגוריה לשייך 🤔\n"
-                f"הוצאה: {data.get('description')} {data.get('amount')}₪\n\n"
+                f"הוצאה: {description} {data.get('amount')}₪\n\n"
                 "בחר קטגוריה:\n" +
                 " | ".join(VALID_CATEGORIES)
             )
 
         data["category"] = category
+        data["description"] = description
 
         save_expense(data)
-        learn(data["description"], category)
 
-        return f"נשמר: {data['amount']}₪ על {data['description']} ({category}, {int(confidence*100)}%)"
+        if description and category:
+            learn(f"{category} {description}", category)
+
+        if confidence >= 0.8:
+            return f"נשמר: {data['amount']}₪ על {description} ({category})"
+        else:
+            return f"נשמר: {data['amount']}₪ על {description} ({category}, {int(confidence*100)}%)"
+
 
     # =========================
     # 📊 סיכום חודשי
@@ -181,8 +195,12 @@ def handle(text):
     # 🔁 הוצאה קבועה
     # =========================
     elif action == "add_fixed_expense":
+        description = data.get("description") or text
+        data["description"] = description
+
         add_fixed_expense(data)
-        return f"הוצאה קבועה נוספה: {data['description']} {data['amount']}₪"
+        return f"הוצאה קבועה נוספה: {description} {data['amount']}₪"
+
 
     elif action == "reset_fixed_expenses":
         set_pending({"action": "confirm_reset_fixed"})
@@ -207,6 +225,9 @@ def handle(text):
         return f"התקציב הכולל הוגדר ל־{data['amount']}₪"
 
     elif action == "set_category_budget":
+        if not data.get("category"):
+            return "חסרה קטגוריה"
+
         set_category_budget(data["category"], data["amount"])
         return f"תקציב {data['category']} הוגדר ל־{data['amount']}₪"
 
