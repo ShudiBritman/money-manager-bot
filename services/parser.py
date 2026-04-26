@@ -1,6 +1,11 @@
 import json
 from .openai_service import ask_gpt
 
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 MONTHS = [
     "ינואר","פברואר","מרץ","אפריל","מאי","יוני",
     "יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"
@@ -120,6 +125,8 @@ def parse_message(text):
 
     response = ask_gpt(messages)
 
+    logger.info(f"RAW GPT RESPONSE: {response}")
+    
     if not response:
         return {"action": "unknown"}
 
@@ -133,11 +140,11 @@ def parse_message(text):
     try:
         data = json.loads(response)
     except Exception as e:
-        print("❌ JSON ERROR:", response, e)
+        logger.error(f"PARSER ERROR: {e}")
         return {"action": "unknown"}
 
     if not data or "action" not in data:
-        print("❌ INVALID DATA:", data)
+        logger.error(f"PARSER ERROR: {e}")
         return {"action": "unknown"}
 
     # זיהוי חודש רק לסיכומים

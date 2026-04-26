@@ -20,6 +20,10 @@ from logic.summary import (
     get_category_total,
     month_name_to_number
 )
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 VALID_CATEGORIES = ["אוכל", "אוכל בחוץ", "תחבורה", "דיור", "בגדים", "חשבונות", "בלתי צפוי", "כללי"]
@@ -97,7 +101,7 @@ def handle(text):
     try:
         data = parse_message(text)
     except Exception as e:
-        print("PARSER ERROR:", str(e))
+        logger.error(f"PARSER ERROR: {e}")
         return "שגיאה, נסה שוב 🙏"
 
     action = data.get("action")
