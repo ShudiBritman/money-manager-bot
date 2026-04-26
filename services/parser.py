@@ -36,6 +36,9 @@ def save_memory(memory):
 # 🧠 למידה
 # -----------------------
 def learn_category(text, category):
+    if not category:
+        return
+
     memory = load_memory()
     words = text.lower().split()
 
@@ -54,7 +57,7 @@ def fix_category(text, category):
     text_lower = text.lower()
     memory = load_memory()
 
-    # 1. זיכרון קודם
+    # 1. זיכרון קודם (הכי חזק)
     for word, cat in memory.items():
         if word in text_lower:
             return cat
@@ -75,7 +78,8 @@ def fix_category(text, category):
     if any(w in text_lower for w in ["חשמל", "מים", "אינטרנט", "טלפון"]):
         return "חשבונות"
 
-    return category
+    # ❗ אין התאמה → לא מנחשים
+    return None
 
 
 # -----------------------
@@ -93,42 +97,30 @@ def detect_month(text):
 # -----------------------
 def parse_message(text):
     messages = [
-    {
-        "role": "system",
-        "content": """
+        {
+            "role": "system",
+            "content": """
 אתה מערכת לניהול הוצאות.
 
 תחזיר JSON בלבד.
 
-אם אינך בטוח בקטגוריה → בחר "כללי".
-
 פעולות:
+add_expense, add_fixed_expense, get_summary, get_category,
+delete_last, set_total_budget, set_category_budget,
+remaining_total, remaining_category, reset,
+get_fixed_expenses, reset_fixed_expenses, get_month_summary
 
-1. add_expense
-2. add_fixed_expense
-3. get_summary
-4. get_category
-5. delete_last
-6. set_total_budget
-7. set_category_budget
-8. remaining_total
-9. remaining_category
-10. reset
-11. get_fixed_expenses
-12. reset_fixed_expenses
-13. get_month_summary
-
-קטגוריות מותרות בלבד:
+קטגוריות:
 בגדים, אוכל, תחבורה, דיור, חשבונות, כללי, בלתי צפוי, אוכל בחוץ
 
 חוקים:
+- לא לנחש קטגוריה
+- אם לא בטוח → category = null
 - תמיד להחזיר JSON בלבד
-- לא להחזיר טקסט נוסף
-- לזהות סכומים מתוך משפט
 """
-    },
-    {"role": "user", "content": text}
-]
+        },
+        {"role": "user", "content": text}
+    ]
 
     response = ask_gpt(messages)
     logger.info(f"RAW GPT RESPONSE: {response}")
@@ -138,7 +130,7 @@ def parse_message(text):
 
     response = response.strip()
 
-    # ניקוי קוד בלוקים
+    # ניקוי ```json
     if response.startswith("```"):
         parts = response.split("```")
         if len(parts) > 1:
@@ -153,7 +145,6 @@ def parse_message(text):
         return {"action": "unknown"}
 
     if not data or "action" not in data:
-        logger.error("INVALID RESPONSE STRUCTURE")
         return {"action": "unknown"}
 
     # -----------------------
@@ -168,15 +159,26 @@ def parse_message(text):
         }
 
     # -----------------------
-    # 🔧 תיקון ולמידה
+    # 🔧 תיקון קטגוריה
     # -----------------------
     if data.get("action") in ["add_expense", "add_fixed_expense"]:
-        original_category = data.get("category", "כללי")
 
-        fixed = fix_category(text, original_category)
-        data["category"] = fixed
+        gpt_category = data.get("category")
 
-        # למידה
-        learn_category(text, fixed)
+        fixed = fix_category(text, gpt_category)
+
+        logger.info(f"TEXT: {text}")
+        logger.info(f"GPT CATEGORY: {gpt_category}")
+        logger.info(f"FIXED CATEGORY: {fixed}")
+
+        if fixed:
+            data["category"] = fixed
+
+            # ✅ למידה רק אם בטוחים
+            learn_category(text, fixed)
+
+        else:
+            # ❗ אין קטגוריה → שואל user
+            data["category"] = None
 
     return data

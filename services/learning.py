@@ -1,15 +1,44 @@
 from storage.db import learn_words, get_learning_scores
 import re
 
+# מילים שלא רוצים ללמוד
+STOPWORDS = {
+    "על", "עם", "של", "את", "זה", "זו",
+    "קניתי", "קונה", "שילמתי", "הוצאתי",
+    "שקל", "שח", "₪",
+    "לי", "שלי", "זה", "פה", "שם"
+}
+
 
 def tokenize(text):
-    return re.findall(r'\w+', text.lower())
+    words = re.findall(r'\w+', text.lower())
+
+    filtered = []
+
+    for w in words:
+        # ❌ סינון מספרים
+        if w.isdigit():
+            continue
+
+        # ❌ סינון מילים קצרות מדי
+        if len(w) < 3:
+            continue
+
+        # ❌ סינון מילים לא רלוונטיות
+        if w in STOPWORDS:
+            continue
+
+        filtered.append(w)
+
+    return filtered
 
 
 def learn(description, category):
     words = tokenize(description)
+
     if not words:
         return
+
     learn_words(words, category)
 
 
