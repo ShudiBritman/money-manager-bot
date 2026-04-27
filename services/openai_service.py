@@ -8,7 +8,7 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 def ask_gpt(messages):
     response = client.chat.completions.create(
-        model="gpt-4.1-mini",
+        model="gpt-4o-mini",  # תוקן: gpt-4.1-mini לא קיים
         messages=messages
     )
     return response.choices[0].message.content

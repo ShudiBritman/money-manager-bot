@@ -1,5 +1,4 @@
 import json
-import os
 import logging
 import re
 from .openai_service import ask_gpt
@@ -7,7 +6,8 @@ from .openai_service import ask_gpt
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-MEMORY_FILE = "storage/category_memory.json"
+# תוקן: הוסר MEMORY_FILE ומנגנון הלמידה המקביל (category_memory.json)
+# הלמידה מתבצעת דרך learning.py + טבלת learning בלבד
 
 MONTHS = [
     "ינואר","פברואר","מרץ","אפריל","מאי","יוני",
@@ -48,6 +48,7 @@ VALID_CATEGORIES = [
     "בגדים", "חשבונות", "בלתי צפוי", "כללי"
 ]
 
+
 # -----------------------
 # 🔢 חילוץ מספר חכם
 # -----------------------
@@ -67,24 +68,6 @@ def extract_number_from_text(text):
 
 
 # -----------------------
-# 📚 זיכרון
-# -----------------------
-def load_memory():
-    if not os.path.exists(MEMORY_FILE):
-        return {}
-    try:
-        with open(MEMORY_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return {}
-
-
-def save_memory(memory):
-    with open(MEMORY_FILE, "w", encoding="utf-8") as f:
-        json.dump(memory, f, ensure_ascii=False, indent=2)
-
-
-# -----------------------
 # 🧠 ניקוי מילים
 # -----------------------
 def tokenize(text):
@@ -99,32 +82,10 @@ def tokenize(text):
 
 
 # -----------------------
-# 🧠 למידה
-# -----------------------
-def learn_category(text, category):
-    if not category:
-        return
-
-    memory = load_memory()
-    words = tokenize(text)
-
-    for w in words:
-        memory[w] = category
-
-    save_memory(memory)
-
-
-# -----------------------
-# 🔧 תיקון קטגוריה
+# 🔧 תיקון קטגוריה (ללא זיכרון JSON — רק חוקים)
 # -----------------------
 def fix_category(text, category):
     text_lower = text.lower()
-    memory = load_memory()
-
-    # זיכרון קודם
-    for word, cat in memory.items():
-        if word in text_lower:
-            return cat
 
     # חוקים
     if any(w in text_lower for w in ["חולצה", "מכנס", "נעל", "בגד"]):
@@ -142,7 +103,7 @@ def fix_category(text, category):
     if any(w in text_lower for w in ["חשמל", "מים", "אינטרנט", "טלפון"]):
         return "חשבונות"
 
-    # 👉 אם GPT כן נתן משהו — אל תהרוס
+    # אם GPT נתן קטגוריה — לא לדרוס
     return category
 
 
@@ -154,6 +115,20 @@ def detect_month(text):
         if m in text:
             return m
     return None
+
+
+# -----------------------
+# 🧹 ניקוי תשובת GPT
+# -----------------------
+def clean_gpt_response(response):
+    """מנקה markdown fences מתשובת GPT באופן אמין"""
+    response = response.strip()
+
+    # הסרת ```json ... ``` או ``` ... ```
+    response = re.sub(r'^```(?:json)?\s*', '', response)
+    response = re.sub(r'\s*```$', '', response)
+
+    return response.strip()
 
 
 # -----------------------
@@ -273,20 +248,13 @@ add_category, delete_fixed_by_id, cancel
     if not response:
         return {"action": "unknown"}
 
-    response = response.strip()
-
-    # ניקוי markdown
-    if response.startswith("```"):
-        parts = response.split("```")
-        if len(parts) > 1:
-            response = parts[1]
-
-    response = response.replace("json", "").strip()
+    # תוקן: ניקוי markdown אמין
+    response = clean_gpt_response(response)
 
     try:
         data = json.loads(response)
     except Exception as e:
-        logger.error(f"PARSER ERROR: {e}")
+        logger.error(f"PARSER ERROR: {e} | response: {response}")
         return {"action": "unknown"}
 
     if not data or "action" not in data:

@@ -141,7 +141,6 @@ def handle(text):
 
         category_input = text.strip()
 
-        # ✅ אם כתב קטגוריה ישירות
         if category_input in VALID_CATEGORIES:
             category = category_input
             confidence = 1
@@ -159,14 +158,12 @@ def handle(text):
         description = pending.get("description") or ""
         pending["description"] = description
 
-        # ❗ חשוב: אם זה fixed → לשמור נכון
         if pending.get("type") == "fixed":
             add_fixed_expense(pending)
         else:
             save_expense(pending)
 
         learn(description, category)
-
         clear_pending()
 
         return f"נשמר: {pending['amount']}₪ על {pending['description']} ({category})"
@@ -211,7 +208,6 @@ def handle(text):
 
         description = data.get("description") or text
 
-        # ניקוי טקסט
         for word in ["תוסיף", "הוצאה", "קבועה"]:
             description = description.replace(word, "").strip()
 
@@ -222,7 +218,7 @@ def handle(text):
 
         if not category:
             data["description"] = description
-            data["type"] = "fixed"  # ✅ קריטי
+            data["type"] = "fixed"
             set_pending(data)
 
             return (
@@ -238,6 +234,13 @@ def handle(text):
         add_fixed_expense(data)
 
         return f"הוצאה קבועה נוספה: {description} {data['amount']}₪"
+
+    # =========================
+    # 🔄 איפוס — תוקן: היה חסר לחלוטין
+    # =========================
+    elif action == "reset":
+        set_pending({"action": "confirm_reset"})
+        return "למחוק את כל ההוצאות? כתוב כן או לא"
 
     elif action == "reset_fixed_expenses":
         set_pending({"action": "confirm_reset_fixed"})
@@ -334,6 +337,63 @@ def handle(text):
             msg += f"{k}: {v}₪\n"
 
         return msg
+
+    # =========================
+    # 💰 תקציב כולל — תוקן: היה חסר לחלוטין
+    # =========================
+    elif action == "set_total_budget":
+
+        amount = data.get("amount")
+
+        if not amount:
+            return "לא הבנתי את הסכום 🤔"
+
+        set_total_budget(amount)
+        return f"תקציב חודשי נקבע ל־{amount}₪ ✅"
+
+    # =========================
+    # 💰 תקציב לפי קטגוריה — תוקן: היה חסר לחלוטין
+    # =========================
+    elif action == "set_category_budget":
+
+        category = data.get("category")
+        amount = data.get("amount")
+
+        if not category or not amount:
+            return "לא הבנתי את הקטגוריה או הסכום 🤔"
+
+        set_category_budget(category, amount)
+        return f"תקציב לקטגוריה {category} נקבע ל־{amount}₪ ✅"
+
+    # =========================
+    # 📊 יתרת תקציב — תוקן: היה חסר לחלוטין
+    # =========================
+    elif action == "remaining_total":
+
+        budget = get_budget()
+        monthly = budget.get("monthly_budget", 0)
+
+        if not monthly:
+            return "לא הוגדר תקציב חודשי עדיין"
+
+        total, _ = get_monthly_summary()
+        remaining = monthly - total
+
+        status = "✅" if remaining >= 0 else "⚠️ חרגת!"
+        return f"תקציב: {monthly}₪ | הוצאות: {total}₪ | נשאר: {remaining}₪ {status}"
+
+    # =========================
+    # ➕ קטגוריה חדשה — תוקן: היה חסר לחלוטין
+    # =========================
+    elif action == "add_category":
+
+        name = data.get("name", "").strip()
+
+        if not name:
+            return "לא הבנתי את שם הקטגוריה 🤔"
+
+        add_category(name)
+        return f"קטגוריה '{name}' נוספה ✅"
 
     return "לא הבנתי 🤔"
 

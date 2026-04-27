@@ -144,10 +144,11 @@ def set_category_budget(category, amount):
 
 
 # -----------------------
-# 📌 הוצאות קבועות (עם ID!)
+# 📌 הוצאות קבועות
 # -----------------------
 
 def load_fixed():
+    # תוקן: הוסרה הגדרה כפולה — נשאר רק הגרסה עם ORDER BY
     rows = query(
         """
         SELECT id, amount, category, description
@@ -213,6 +214,27 @@ def get_fixed_expenses():
 
 def reset_fixed_expenses():
     query("DELETE FROM fixed_expenses")
+
+
+def delete_fixed_expense_by_id(expense_id):
+    row = query(
+        "SELECT id, amount, category, description FROM fixed_expenses WHERE id = %s",
+        (expense_id,),
+        fetch=True
+    )
+
+    if not row:
+        return None
+
+    query("DELETE FROM fixed_expenses WHERE id = %s", (expense_id,))
+
+    r = row[0]
+    return {
+        "id": r[0],
+        "amount": float(r[1]),
+        "category": r[2],
+        "description": r[3]
+    }
 
 
 # -----------------------
@@ -321,7 +343,6 @@ def learn_words(words, category):
         conn.close()
 
 
-
 def get_learning_scores(words):
     if not words:
         return {}
@@ -338,42 +359,3 @@ def get_learning_scores(words):
     ) or []
 
     return {r[0]: float(r[1]) for r in rows}
-
-
-
-def load_fixed():
-    rows = query(
-        "SELECT id, amount, category, description FROM fixed_expenses",
-        fetch=True
-    ) or []
-
-    return [
-        {
-            "id": r[0],
-            "amount": float(r[1]),
-            "category": r[2],
-            "description": r[3]
-        }
-        for r in rows
-    ]
-
-
-def delete_fixed_expense_by_id(expense_id):
-    row = query(
-        "SELECT id, amount, category, description FROM fixed_expenses WHERE id = %s",
-        (expense_id,),
-        fetch=True
-    )
-
-    if not row:
-        return None
-
-    query("DELETE FROM fixed_expenses WHERE id = %s", (expense_id,))
-
-    r = row[0]
-    return {
-        "id": r[0],
-        "amount": float(r[1]),
-        "category": r[2],
-        "description": r[3]
-    }
